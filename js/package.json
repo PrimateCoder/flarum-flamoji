@@ -1,10 +1,10 @@
 {
     "name": "@the-turk/flarum-flamoji",
-    "description": "Simple emoji manager for Flarum.",
+    "description": "Simple emoji manager for Flarum. This fork includes fixes for https://forum.pianotell.com/.",
     "license": "MIT",
     "version": "0.0.0",
     "dependencies": {
-        "@joeattardi/emoji-button": "^4.6.0",
+        "@joeattardi/emoji-button": "git://github.com/primatecoder/emoji-button",
         "@roderickhsiao/emoji-button-locale-data": "^0.1.2",
         "copy-webpack-plugin": "^11.0.0",
         "file-saver": "2.0.5",
@@ -21,7 +21,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "git://github.com/the-turk/flarum-flamoji.git"
+        "url": "git://github.com/primatecoder/flarum-flamoji.git"
     },
     "scripts": {
         "dev": "webpack --mode development --watch",

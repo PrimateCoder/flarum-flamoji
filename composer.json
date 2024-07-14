@@ -1,6 +1,6 @@
 {
     "name": "the-turk/flarum-flamoji",
-    "description": "Simple emoji manager for Flarum.",
+    "description": "Simple emoji manager for Flarum. This fork includes fixes for https://forum.pianotell.com/.",
     "keywords": [
         "flarum",
         "emoji",

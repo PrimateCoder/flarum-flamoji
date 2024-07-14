@@ -4,6 +4,10 @@
 
 Simple emoji manager for Flarum.
 
+This fork includes fixes for [🎹 Piano | Tell](https://forum.pianotell.com).
+
+Note to self: cd js && npm install && npm run build
+
 Screenshots:
 
 ![Picker](https://i.imgur.com/I7l1s6O.png)
