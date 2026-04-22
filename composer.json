@@ -1,6 +1,6 @@
 {
     "name": "pianotell/flarum-ext-flamoji",
-    "description": "Simple emoji manager for Flarum. Maintained fork of the-turk/flarum-flamoji (discontinued) originally for https://forum.pianotell.com/.",
+    "description": "Simple emoji manager for Flarum. Fork of the-turk/flarum-flamoji, originally created for PianoTell, but now available to all.",
     "keywords": [
         "flarum",
         "emoji",
@@ -49,7 +49,9 @@
         "test:setup": "Initializes the test DB schema + storage. Run once before test:integration."
     },
     "conflict": {
-        "clarkwinkelmann/flarum-ext-emojionearea": "*",
+        "clarkwinkelmann/flarum-ext-emojionearea": "*"
+    },
+    "replace": {
         "the-turk/flarum-flamoji": "*"
     },
     "suggest": {

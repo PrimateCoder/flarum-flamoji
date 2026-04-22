@@ -24,17 +24,23 @@ config.output = {
   path: path.resolve(__dirname, '../assets/dist'),
   chunkLoadingGlobal: 'webpackChunkPianotellFlamoji',
   uniqueName: 'pianotell-flamoji',
-  // Cache-bust dynamically loaded chunks. Flarum's asset pipeline only
-  // hashes the entry-point bundles (forum.js / admin.js); split chunks
-  // (emoji-mart, emoji-mart-data) are served as plain static files from
-  // /assets/extensions/pianotell-flamoji/dist/ with no version in their
-  // URL, so browsers happily return the stale cached copy after a code
-  // update. Baking a content hash into the chunk filename forces a fresh
-  // URL whenever the chunk's contents change. `filename` is intentionally
-  // left untouched so forum.js / admin.js keep the names Flarum expects.
-  // `clean: true` removes orphan hashed chunks from previous builds so
-  // the output dir doesn't accumulate.
-  chunkFilename: '[name].[contenthash:8].js',
+  // Stable chunk filenames (no content hash). Webpack's default
+  // [name].[contenthash].js is great for browser cache-busting, but
+  // Flarum's `assets:publish` is a one-way copy: it never prunes the
+  // destination directory. Every release with new chunk hashes leaves
+  // the previous release's chunks orphaned in
+  // /public/assets/extensions/pianotell-flamoji/dist/, accumulating
+  // forever — and a partial upgrade (composer-update succeeded but
+  // assets:publish hasn't run yet) leaves the new forum.js
+  // referencing a hash that isn't on disk → 404 + ChunkLoadError.
+  //
+  // Stable names trade browser cache-busting for cleanup: each new
+  // release overwrites the previous chunks in place, no orphans pile
+  // up, and there's no hash mismatch window. Browsers may serve the
+  // previous chunk from cache for the cache TTL after an upgrade,
+  // but a hard-refresh recovers and the failure mode is "old code
+  // runs briefly", not "feature is permanently broken".
+  chunkFilename: '[name].js',
   clean: true,
 };
 

@@ -74,7 +74,7 @@ pianotell-flamoji:
     # its `i18n` prop. Anything we don't override here falls back to
     # emoji-mart's built-in English defaults.
     emoji-mart:
-      search_placeholder: Search Emojis
+      search_placeholder: Search
       no_emojis_found_title: Oh no!
       no_emojis_found_message: No emojis found
       pick: Pick an emoji

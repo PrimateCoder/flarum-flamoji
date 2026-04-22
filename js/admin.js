@@ -1,8 +1,6 @@
 // Side-effect: registers the initializer.
 import './src/admin';
 
-// Forward-compat with Flarum 2.x's Export Registry: re-export both the
-// named exports and the default namespace from the entry module so that
-// `ext:pianotell/flamoji/admin` resolves to our public surface.
+// Re-export named exports from the entry module so other extensions
+// can import them via Flarum's own re-export pipeline.
 export * from './src/admin';
-export { default } from './src/admin';
