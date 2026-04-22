@@ -10,3 +10,6 @@ tests/.phpunit.result.cache
 .idea/*
 .vscode
 js/coverage-ts
+tests/ux/node_modules
+tests/ux/_failure.png
+tests/ux/_failures.json

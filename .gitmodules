@@ -1,0 +1,3 @@
+[submodule ".pianotell"]
+	path = .pianotell
+	url = git@github.com:PrimateCoder/pianotell-flarum-common.git

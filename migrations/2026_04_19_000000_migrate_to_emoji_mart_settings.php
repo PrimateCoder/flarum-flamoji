@@ -15,7 +15,11 @@
  * 2. Delete settings that no longer have an emoji-mart analogue:
  *    emoji_style (always Twemoji now via getSpritesheetURL),
  *    emoji_data (i18n is driven from Flarum translations directly),
- *    initial_category (emoji-mart picks Frequent automatically).
+ *    initial_category (emoji-mart picks Frequent automatically),
+ *    emoji_version (emoji-mart only filters the bundled Unicode 14
+ *    dataset by version; the setting can never enable newer emoji,
+ *    only hide ones we already ship — superseded by the new
+ *    `picker_set` admin option).
  *
  * 3. Rewrite `specify_categories` JSON values from the emoji-button
  *    category IDs to emoji-mart's. Notably, `smileys` and `people`
@@ -63,6 +67,7 @@ return [
                 'pianotell-flamoji.emoji_style',
                 'pianotell-flamoji.emoji_data',
                 'pianotell-flamoji.initial_category',
+                'pianotell-flamoji.emoji_version',
             ])
             ->delete();
 

@@ -20,8 +20,11 @@ pianotell-flamoji:
       show_recents_label: Show (and save) most recently used emojis
       frequent_rows_label: Frequent emoji rows
       frequent_rows_text: Number of rows of recently/frequently used emojis to display at the top of the picker (1-10).
-      emoji_version_label: Emoji version
-      emoji_version_text: The version of the Unicode emoji specification to use. Newer versions include more emoji.
+      picker_set_label: Emoji style
+      picker_set_text: How emojis appear in the picker. "Match Emoji extension" uses Twemoji when the Flarum Emoji extension is enabled, and native OS fonts otherwise — matching what posts actually display.
+      picker_set_auto: Match Emoji extension (recommended)
+      picker_set_twemoji: Always Twemoji
+      picker_set_native: Always native (OS fonts)
       specify_categories_label: Specify categories
       specify_categories_text: You can specify a list of categories here, and the picker will only show those categories.
 

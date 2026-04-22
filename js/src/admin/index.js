@@ -120,27 +120,19 @@ app.initializers.add('pianotell-flamoji', (app) => {
           </div>
           <div className="Flamoji--emojiSetting">
             <div className="Form-group">
-              <label>{app.translator.trans('pianotell-flamoji.admin.settings.emoji_version_label')}</label>
+              <label>{app.translator.trans('pianotell-flamoji.admin.settings.picker_set_label')}</label>
               <Select
-                value={this.setting(['pianotell-flamoji.emoji_version'])() || '14'}
+                value={this.setting(['pianotell-flamoji.picker_set'])() || 'auto'}
                 options={{
-                  '1': '1.0',
-                  '2': '2.0',
-                  '3': '3.0',
-                  '4': '4.0',
-                  '5': '5.0',
-                  '11': '11.0',
-                  '12': '12.0',
-                  '12.1': '12.1',
-                  '13': '13.0',
-                  '13.1': '13.1',
-                  '14': '14.0',
+                  auto: app.translator.trans('pianotell-flamoji.admin.settings.picker_set_auto'),
+                  twemoji: app.translator.trans('pianotell-flamoji.admin.settings.picker_set_twemoji'),
+                  native: app.translator.trans('pianotell-flamoji.admin.settings.picker_set_native'),
                 }}
                 buttonClassName="Button"
-                onchange={this.settings['pianotell-flamoji.emoji_version']}
+                onchange={this.settings['pianotell-flamoji.picker_set']}
               />
             </div>
-            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.emoji_version_text')}</div>
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.picker_set_text')}</div>
           </div>
         </div>
 

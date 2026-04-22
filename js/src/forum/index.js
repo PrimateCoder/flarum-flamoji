@@ -318,6 +318,15 @@ app.initializers.add(
       const showVariants = !!app.forum.attribute('flamoji.show_variants');
       const showCategoryButtons = !!app.forum.attribute('flamoji.show_category_buttons');
 
+      // Match the picker's emoji rendering to what posts will actually
+      // display: the core flarum/emoji extension rewrites unicode to
+      // Twemoji <img>; without it, posts render OS-native glyphs. The
+      // `picker_set` admin setting can force one or the other; default
+      // `auto` follows whatever the core extension is doing.
+      const pickerSet = app.forum.attribute('flamoji.picker_set') || 'auto';
+      const hasEmojiExt = !!app.forum.attribute('flamoji.has_emoji_extension');
+      const useTwemoji = pickerSet === 'twemoji' || (pickerSet === 'auto' && hasEmojiExt);
+
       const picker = new Picker({
         data,
         custom: customEmojis,
@@ -328,9 +337,8 @@ app.initializers.add(
         // otherwise pop up bright-white against dark chrome.
         theme: 'auto',
         autoFocus: false,
-        set: 'twitter',
-        getSpritesheetURL: () => TWEMOJI_SPRITESHEET_URL,
-        emojiVersion: parseFloat(app.forum.attribute('flamoji.emoji_version')) || 14,
+        set: useTwemoji ? 'twitter' : 'native',
+        ...(useTwemoji ? { getSpritesheetURL: () => TWEMOJI_SPRITESHEET_URL } : {}),
         // Tile sizing — emoji-mart defaults (perLine: 9, emojiSize: 24,
         // button: 36) make the grid smaller than the original emoji-button
         // picker. Picker overall width auto-scales to

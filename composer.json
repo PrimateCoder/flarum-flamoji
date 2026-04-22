@@ -34,6 +34,9 @@
         "clarkwinkelmann/flarum-ext-emojionearea": "*",
         "the-turk/flarum-flamoji": "*"
     },
+    "suggest": {
+        "flarum/emoji": "Recommended companion. Parses standard emoji shortcodes (e.g. :smile:) typed in posts and renders unicode emoji as Twemoji for visual consistency. When this extension is enabled, Flamoji's picker matches it by serving Twemoji sprites; when disabled (and `picker_set` is on `auto`), the picker switches to native OS rendering so the picker preview matches the post output."
+    },
     "autoload": {
         "psr-4": {
             "PianoTell\\Flamoji\\": "src/"
