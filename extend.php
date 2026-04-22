@@ -21,11 +21,11 @@ use PianoTell\Flamoji\Api\Controllers;
 return [
     (new Extend\Frontend('forum'))
         ->css(__DIR__.'/less/forum.less')
-        ->js(__DIR__.'/js/dist/forum.js'),
+        ->js(__DIR__.'/assets/dist/forum.js'),
 
     (new Extend\Frontend('admin'))
         ->css(__DIR__.'/less/admin.less')
-        ->js(__DIR__.'/js/dist/admin.js'),
+        ->js(__DIR__.'/assets/dist/admin.js'),
 
     new Extend\Locales(__DIR__.'/locale'),
 
@@ -41,7 +41,7 @@ return [
 
     (new Extend\Settings())
         ->default('pianotell-flamoji.auto_hide', true)
-        ->default('pianotell-flamoji.show_preview', false)
+        ->default('pianotell-flamoji.show_preview', true)
         ->default('pianotell-flamoji.show_search', true)
         ->default('pianotell-flamoji.show_variants', true)
         ->default('pianotell-flamoji.picker_set', 'auto')

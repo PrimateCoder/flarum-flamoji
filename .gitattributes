@@ -11,8 +11,8 @@
 **/tests export-ignore
 .pianotell export-ignore
 
-**/js/dist/**/* -diff
-**/js/dist/**/* linguist-generated
+**/assets/dist/**/* -diff
+**/assets/dist/**/* linguist-generated
 **/js/dist-typings/**/* -diff
 **/js/dist-typings/**/* linguist-generated
 **/js/yarn.lock -diff

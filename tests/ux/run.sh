@@ -22,6 +22,12 @@ cd "$ROOT"
 # Specs to run (paths relative to repo root, no .spec.mjs suffix).
 SPECS=(
   tests/ux/picker-positioning.spec.mjs
+  tests/ux/picker-features.spec.mjs
+  tests/ux/admin-options.spec.mjs
+  tests/ux/custom-emoji.spec.mjs
+  tests/ux/import-export.spec.mjs
+  tests/ux/picker-baseline.spec.mjs
+  tests/ux/picker-loading.spec.mjs
 )
 
 # Auto-init the submodule on a fresh clone. Skip cleanly if the

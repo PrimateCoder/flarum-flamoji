@@ -13,3 +13,6 @@ js/coverage-ts
 tests/ux/node_modules
 tests/ux/_failure.png
 tests/ux/_failures.json
+tests/ux/_picker_actual.png
+tests/ux/_picker_baseline_diff.png
+tests/ux/_probe.spec.mjs

@@ -1,0 +1,32 @@
+{
+  "visible": true,
+  "hasSearchInput": true,
+  "hasPreview": true,
+  "hasSkinToneButton": true,
+  "navLabels": [
+    "Recently Used",
+    "Smileys & People",
+    "Animals & Nature",
+    "Food & Drink",
+    "Activities",
+    "Travel & Places",
+    "Objects",
+    "Symbols",
+    "Flags",
+    "Custom"
+  ],
+  "categoryHeadings": [
+    "Recently Used",
+    "Smileys & People",
+    "Animals & Nature",
+    "Food & Drink",
+    "Activities",
+    "Travel & Places",
+    "Objects",
+    "Symbols",
+    "Flags",
+    "Custom"
+  ],
+  "firstTileUsesTwemojiSprite": false,
+  "firstTileHasSpriteBackground": true
+}

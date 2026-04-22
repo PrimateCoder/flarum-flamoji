@@ -1,6 +1,6 @@
 {
     "name": "pianotell/flarum-ext-flamoji",
-    "description": "Simple emoji manager for Flarum. Maintained fork of the-turk/flarum-flamoji (discontinued) with fixes for https://forum.pianotell.com/.",
+    "description": "Simple emoji manager for Flarum. Maintained fork of the-turk/flarum-flamoji (discontinued) originally for https://forum.pianotell.com/.",
     "keywords": [
         "flarum",
         "emoji",
@@ -30,6 +30,24 @@
         "php": ">=8.1",
         "flarum/core": "^1.8.0"
     },
+    "require-dev": {
+        "flarum/testing": "^1.0.0"
+    },
+    "scripts": {
+        "test": [
+            "@test:unit",
+            "@test:integration"
+        ],
+        "test:unit": "phpunit -c tests/phpunit.unit.xml --no-coverage",
+        "test:integration": "phpunit -c tests/phpunit.integration.xml --no-coverage",
+        "test:setup": "@php tests/integration/setup.php"
+    },
+    "scripts-descriptions": {
+        "test": "Runs all tests (unit + integration). Integration tests require DB env vars (see tests/README.md).",
+        "test:unit": "Runs unit tests in tests/unit (no DB required).",
+        "test:integration": "Runs Flarum integration tests in tests/integration (requires test DB).",
+        "test:setup": "Initializes the test DB schema + storage. Run once before test:integration."
+    },
     "conflict": {
         "clarkwinkelmann/flarum-ext-emojionearea": "*",
         "the-turk/flarum-flamoji": "*"
@@ -42,13 +60,18 @@
             "PianoTell\\Flamoji\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "PianoTell\\Flamoji\\Tests\\": "tests/"
+        }
+    },
     "extra": {
         "flarum-extension": {
             "title": "Flamoji",
             "category": "feature",
             "icon": {
                 "name": "far fa-smile-wink",
-                "backgroundColor": "#b72a2a",
+                "backgroundColor": "#004d4d",
                 "color": "#fff"
             },
             "database-support": [
@@ -68,7 +91,7 @@
                 "prettier": true,
                 "typescript": false,
                 "bundlewatch": false,
-                "backendTesting": false,
+                "backendTesting": true,
                 "editorConfig": true,
                 "styleci": true
             }

@@ -3,14 +3,10 @@
 @import "admin/CustomEmojiList";
 
 .Flamoji--settingsContainer {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
   margin-bottom: 24px;
-
-  > div {
-    max-width: 400px;
-  }
 
   h3 {
     color: @muted-color;
@@ -44,14 +40,11 @@
 
   .specifyCategoriesGroup {
     .options {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     }
 
     .cat-checkbox {
-      flex: 50%;
-
       & label {
         font-weight: 400;
         color: @muted-color;

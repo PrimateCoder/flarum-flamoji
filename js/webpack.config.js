@@ -1,3 +1,4 @@
+const path = require('path');
 const config = require('flarum-webpack-config')();
 
 // flarum-webpack-config sets `output.library = 'module.exports'` so the
@@ -14,8 +15,27 @@ const config = require('flarum-webpack-config')();
 // and emoji-mart-data chunks reach our runtime.
 config.output = {
   ...(config.output || {}),
+  // Build directly into the extension's `assets/` directory, which is what
+  // Flarum's Extension::copyAssetsTo() publishes recursively to
+  // /public/assets/extensions/<id>/ at install/publish time. Building into
+  // the default `js/dist/` and then mirroring is what previous maintainers
+  // did, and the two copies drifted — keep one source of truth.
+  // extend.php references `assets/dist/forum.js` accordingly.
+  path: path.resolve(__dirname, '../assets/dist'),
   chunkLoadingGlobal: 'webpackChunkPianotellFlamoji',
   uniqueName: 'pianotell-flamoji',
+  // Cache-bust dynamically loaded chunks. Flarum's asset pipeline only
+  // hashes the entry-point bundles (forum.js / admin.js); split chunks
+  // (emoji-mart, emoji-mart-data) are served as plain static files from
+  // /assets/extensions/pianotell-flamoji/dist/ with no version in their
+  // URL, so browsers happily return the stale cached copy after a code
+  // update. Baking a content hash into the chunk filename forces a fresh
+  // URL whenever the chunk's contents change. `filename` is intentionally
+  // left untouched so forum.js / admin.js keep the names Flarum expects.
+  // `clean: true` removes orphan hashed chunks from previous builds so
+  // the output dir doesn't accumulate.
+  chunkFilename: '[name].[contenthash:8].js',
+  clean: true,
 };
 
 // flarum-webpack-config registers babel-loader on every .js/.ts file with no

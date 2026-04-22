@@ -32,3 +32,67 @@ span.flamoji img {
   margin: 0 0.1em;
   vertical-align: -0.3em;
 }
+
+// Placeholder popup shown while emoji-mart chunks + the custom-emoji API
+// call are in flight on first picker open. Mimics the picker's chrome
+// (border, shadow, radius, body background) so the swap to the real
+// picker reads as the same surface "filling in" rather than two distinct
+// popups appearing.
+.flamoji-picker-loader {
+  position: fixed;
+  z-index: @zindex-modal;
+  width: 330px; // ~ perLine(9) * emojiButtonSize(36) + chrome (emoji-mart defaults)
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  background: @body-bg;
+  color: @text-color;
+  border: 1px solid @control-bg;
+  border-radius: @border-radius;
+  .box-shadow(0 2px 6px @shadow-color);
+  font-size: 14px;
+  text-align: center;
+
+  &__spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid fade(@text-color, 15%);
+    border-top-color: @primary-color;
+    border-radius: 50%;
+    animation: flamoji-loader-spin 0.85s linear infinite;
+  }
+
+  &__label {
+    color: @muted-color;
+  }
+
+  &__retry {
+    margin-top: 4px;
+  }
+
+  &--error {
+    .flamoji-picker-loader__label {
+      color: @text-color;
+    }
+  }
+}
+
+@keyframes flamoji-loader-spin {
+  to { transform: rotate(360deg); }
+}
+
+// Honor reduced-motion preference: replace spin with subtle pulse.
+@media (prefers-reduced-motion: reduce) {
+  .flamoji-picker-loader__spinner {
+    animation: flamoji-loader-pulse 1.6s ease-in-out infinite;
+    border-top-color: @primary-color;
+  }
+  @keyframes flamoji-loader-pulse {
+    0%, 100% { opacity: 0.45; }
+    50%      { opacity: 1; }
+  }
+}

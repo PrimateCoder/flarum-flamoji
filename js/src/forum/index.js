@@ -103,27 +103,38 @@ app.initializers.add(
      * already accounts for page scroll, no offset math needed.
      */
     function positionPicker() {
-      if (!this.picker || !this.flamojiButton) return;
+      if (!this.picker) return;
+      positionElement.call(this, this.picker);
+    }
+
+    /**
+     * Shared positioner used by both the real picker and the loading
+     * placeholder. Same primary/fallback geometry as positionPicker; pulled
+     * out so the loader can reuse it without temporarily aliasing
+     * `this.picker`.
+     */
+    function positionElement(el) {
+      if (!el || !this.flamojiButton) return;
       const btnRect = this.flamojiButton.getBoundingClientRect();
-      const pickerRect = this.picker.getBoundingClientRect();
-      // Reposition won't work until the picker has measurable dimensions —
+      const elRect = el.getBoundingClientRect();
+      // Reposition won't work until the element has measurable dimensions —
       // emoji-mart populates Shadow DOM asynchronously after appendChild,
       // so the first call right after mount sees width/height of 0. The
       // ResizeObserver wired up in buildPicker() will re-fire this once
       // the picker takes its real shape.
-      if (!pickerRect.width || !pickerRect.height) return;
+      if (!elRect.width || !elRect.height) return;
 
       const margin = 6;
       const screenPadding = 8;
 
       const minLeft = screenPadding;
-      const maxLeft = window.innerWidth - pickerRect.width - screenPadding;
+      const maxLeft = window.innerWidth - elRect.width - screenPadding;
       const minTop = screenPadding;
-      const maxTop = window.innerHeight - pickerRect.height - screenPadding;
+      const maxTop = window.innerHeight - elRect.height - screenPadding;
 
       // Try primary placement: horizontally centered on the button.
       const btnCenterX = btnRect.left + btnRect.width / 2;
-      let left = btnCenterX - pickerRect.width / 2;
+      let left = btnCenterX - elRect.width / 2;
       let top;
 
       if (left < minLeft || left > maxLeft) {
@@ -131,12 +142,12 @@ app.initializers.add(
         // anchor the picker's center to the composer's bottom edge.
         const composer = this.element.closest('.ComposerBody') || this.element;
         const composerRect = composer.getBoundingClientRect();
-        left = composerRect.left + (composerRect.width - pickerRect.width) / 2;
-        top = composerRect.bottom - pickerRect.height / 2;
+        left = composerRect.left + (composerRect.width - elRect.width) / 2;
+        top = composerRect.bottom - elRect.height / 2;
       } else {
         // Primary: float above the button; slide up rather than clip if
         // there isn't enough room above.
-        top = btnRect.top - margin - pickerRect.height;
+        top = btnRect.top - margin - elRect.height;
       }
 
       // Final clamp keeps the picker fully on-screen in either mode.
@@ -145,8 +156,8 @@ app.initializers.add(
       if (top > maxTop) top = maxTop;
       if (top < minTop) top = minTop;
 
-      this.picker.style.top = top + 'px';
-      this.picker.style.left = left + 'px';
+      el.style.top = Math.round(top) + 'px';
+      el.style.left = Math.round(left) + 'px';
     }
 
     // Clean up the picker DOM + listeners when the editor is removed (e.g.
@@ -167,6 +178,13 @@ app.initializers.add(
         this._flamojiResizeObserver.disconnect();
         this._flamojiResizeObserver = null;
       }
+      // Tear down the loading-placeholder popup if it's still on screen
+      // (composer dismissed mid-load, or picker mount races teardown).
+      unmountPickerLoader.call(this);
+      if (this._flamojiLoaderTimer) {
+        clearTimeout(this._flamojiLoaderTimer);
+        this._flamojiLoaderTimer = null;
+      }
       if (this.picker && typeof this.picker.remove === 'function') {
         try {
           this.picker.remove();
@@ -179,6 +197,104 @@ app.initializers.add(
       this.isPickerVisible = false;
       this.flamojiButton = null;
     });
+
+    /**
+     * Mount a placeholder popup at the picker's eventual position so the
+     * user gets immediate visual feedback while the emoji-mart chunks +
+     * custom-emoji API are loading on first open. Mount is delayed by
+     * LOADER_DELAY_MS so warm-cache loads (≪100ms) skip the loader
+     * entirely — avoids a flicker where the placeholder appears for one
+     * frame and is immediately replaced.
+     *
+     * If a loader is already mounted (e.g. the user clicked Retry after a
+     * prior failure), it's reused rather than re-mounted.
+     */
+    const LOADER_DELAY_MS = 120;
+
+    function scheduleLoaderMount() {
+      if (this._flamojiLoader || this._flamojiLoaderTimer) return;
+      this._flamojiLoaderTimer = setTimeout(() => {
+        this._flamojiLoaderTimer = null;
+        // Editor torn down or load already finished while we were waiting.
+        if (!this.element || !this.element.isConnected) return;
+        if (!this.isPickerLoading) return;
+        mountPickerLoader.call(this);
+      }, LOADER_DELAY_MS);
+    }
+
+    function mountPickerLoader() {
+      if (this._flamojiLoader) return;
+      const loader = document.createElement('div');
+      loader.className = 'flamoji-picker-loader';
+      loader.setAttribute('role', 'status');
+      loader.setAttribute('aria-live', 'polite');
+
+      const spinner = document.createElement('div');
+      spinner.className = 'flamoji-picker-loader__spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+
+      const label = document.createElement('div');
+      label.className = 'flamoji-picker-loader__label';
+      label.textContent = app.translator.trans(t + 'composer.picker_loading');
+
+      loader.appendChild(spinner);
+      loader.appendChild(label);
+      document.body.appendChild(loader);
+
+      this._flamojiLoader = loader;
+      this._flamojiLoaderReposition = () => positionElement.call(this, loader);
+      window.addEventListener('resize', this._flamojiLoaderReposition);
+      window.addEventListener('scroll', this._flamojiLoaderReposition, true);
+      positionElement.call(this, loader);
+    }
+
+    function unmountPickerLoader() {
+      if (this._flamojiLoaderReposition) {
+        window.removeEventListener('resize', this._flamojiLoaderReposition);
+        window.removeEventListener('scroll', this._flamojiLoaderReposition, true);
+        this._flamojiLoaderReposition = null;
+      }
+      if (this._flamojiLoader) {
+        try { this._flamojiLoader.remove(); } catch (e) { /* already detached */ }
+        this._flamojiLoader = null;
+      }
+    }
+
+    /**
+     * Replace the loader's spinner with an inline error card + Retry button.
+     * Complements the existing top-of-page Alert (which can be missed if the
+     * user is focused on the composer). Retry re-runs the same load path.
+     */
+    function showLoaderError(retryCb) {
+      // If the loader hasn't materialized yet (load failed faster than
+      // LOADER_DELAY_MS), mount it now so the error has a surface to live on.
+      if (this._flamojiLoaderTimer) {
+        clearTimeout(this._flamojiLoaderTimer);
+        this._flamojiLoaderTimer = null;
+      }
+      if (!this._flamojiLoader) mountPickerLoader.call(this);
+
+      const loader = this._flamojiLoader;
+      loader.classList.add('flamoji-picker-loader--error');
+      loader.replaceChildren();
+
+      const label = document.createElement('div');
+      label.className = 'flamoji-picker-loader__label';
+      label.textContent = app.translator.trans(t + 'composer.picker_load_error');
+
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'Button Button--primary flamoji-picker-loader__retry';
+      retry.textContent = app.translator.trans(t + 'composer.picker_load_retry');
+      retry.addEventListener('click', () => {
+        unmountPickerLoader.call(this);
+        retryCb();
+      });
+
+      loader.appendChild(label);
+      loader.appendChild(retry);
+      positionElement.call(this, loader);
+    }
 
     /**
      * emoji-mart's picker lives entirely behind a Shadow DOM, so external
@@ -318,6 +434,15 @@ app.initializers.add(
       const showVariants = !!app.forum.attribute('flamoji.show_variants');
       const showCategoryButtons = !!app.forum.attribute('flamoji.show_category_buttons');
 
+      // emoji-mart's `categories` prop is an explicit allow-list. When
+      // showRecents is enabled, we still need 'frequent' on the list or
+      // the Frequently Used category is silently filtered out — even
+      // though maxFrequentRows > 0 would otherwise enable it. Prepend so
+      // it appears first as emoji-mart expects.
+      if (showRecents && specifiedCategories.indexOf('frequent') === -1) {
+        specifiedCategories.unshift('frequent');
+      }
+
       // Match the picker's emoji rendering to what posts will actually
       // display: the core flarum/emoji extension rewrites unicode to
       // Twemoji <img>; without it, posts render OS-native glyphs. The
@@ -339,15 +464,14 @@ app.initializers.add(
         autoFocus: false,
         set: useTwemoji ? 'twitter' : 'native',
         ...(useTwemoji ? { getSpritesheetURL: () => TWEMOJI_SPRITESHEET_URL } : {}),
-        // Tile sizing — emoji-mart defaults (perLine: 9, emojiSize: 24,
-        // button: 36) make the grid smaller than the original emoji-button
-        // picker. Picker overall width auto-scales to
-        // perLine * emojiButtonSize + chrome, so bumping the button/sprite
-        // sizes here also widens the popup; perLine stays at 8 so layout
-        // doesn't get cramped on narrower viewports.
-        perLine: 8,
-        emojiSize: 32,
-        emojiButtonSize: 44,
+        // Tile sizing — use emoji-mart defaults (perLine: 9,
+        // emojiSize: 24, emojiButtonSize: 36). We previously bumped
+        // these for a chunkier grid, but at larger sizes WebKit's
+        // sub-pixel-rounded IntersectionObserver in emoji-mart's
+        // NavBar reliably mis-picks the previous category when
+        // clicking Travel & Places / Flags (the indicator highlights
+        // the wrong icon). Defaults stay clean across all category
+        // configurations.
         previewPosition: showPreview ? 'bottom' : 'none',
         searchPosition: showSearch ? 'sticky' : 'none',
         skinTonePosition: showVariants ? 'preview' : 'none',
@@ -388,6 +512,10 @@ app.initializers.add(
       // changes (e.g. category navigation expanding rows).
       this.picker = picker;
       picker.classList.add('flamoji-picker-popup');
+      // Tear down the loading placeholder right before the real picker is
+      // attached so positioning math (which is shared) sees the correct
+      // mount target.
+      unmountPickerLoader.call(this);
       document.body.appendChild(picker);
       injectShadowStyles(picker);
 
@@ -435,8 +563,9 @@ app.initializers.add(
 
       this.isPickerLoading = true;
       m.redraw();
+      scheduleLoaderMount.call(this);
 
-      Promise.all([
+      const loadAndBuild = () => Promise.all([
         import(/* webpackChunkName: "emoji-mart" */ 'emoji-mart'),
         import(/* webpackChunkName: "emoji-mart-data" */ '@emoji-mart/data/sets/15/twitter.json'),
         app.request({
@@ -452,6 +581,7 @@ app.initializers.add(
           // and leak listeners on a detached editor element.
           if (!this.element || !this.element.isConnected) {
             this.isPickerLoading = false;
+            unmountPickerLoader.call(this);
             return;
           }
           // Defensive: a corrupt or proxied API response could leave us
@@ -465,9 +595,15 @@ app.initializers.add(
         .catch((err) => {
           console.error('[pianotell-flamoji] failed to load picker:', err);
           this.isPickerLoading = false;
-          // Surface the failure — without this, a CSP block, network
-          // outage, or 4xx on the custom-emoji endpoint silently stops
-          // the spinner and the user has no idea why nothing opened.
+          // Inline error card with Retry button on the loader surface,
+          // plus a top-of-page Alert (some users keep focus inside the
+          // composer and miss page-level alerts).
+          showLoaderError.call(this, () => {
+            this.isPickerLoading = true;
+            m.redraw();
+            scheduleLoaderMount.call(this);
+            loadAndBuild();
+          });
           if (app.alerts) {
             app.alerts.show(
               Alert,
@@ -477,6 +613,8 @@ app.initializers.add(
           }
           m.redraw();
         });
+
+      loadAndBuild();
     }
 
     extend(TextEditor.prototype, 'toolbarItems', function (items) {

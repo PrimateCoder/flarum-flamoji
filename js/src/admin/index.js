@@ -15,22 +15,10 @@ app.initializers.add('pianotell-flamoji', (app) => {
   app.store.models.emojis = Emoji;
   app.customEmojiListState = new CustomEmojiListState();
 
-  extend(ExtensionPage.prototype, ['oncreate', 'onupdate'], function () {
-    if (this.extension.id != 'pianotell-flamoji') return;
-
-    const $recentsCountSetting = this.$('.recentsCountSetting');
-
-    if (!this.setting(['pianotell-flamoji.show_recents'])()) {
-      $recentsCountSetting.hide();
-    } else {
-      $recentsCountSetting.show();
-    }
-  });
-
   extend(ExtensionPage.prototype, 'oninit', function () {
     if (this.extension.id != 'pianotell-flamoji') return;
 
-    this.specifiedCategories = Stream(JSON.parse(this.setting(['pianotell-flamoji.specify_categories'])() || []))();
+    this.specifiedCategories = JSON.parse(app.data.settings['pianotell-flamoji.specify_categories'] || '[]');
   });
 
   extend(ExtensionPage.prototype, 'sections', function (items) {
@@ -48,7 +36,7 @@ app.initializers.add('pianotell-flamoji', (app) => {
 
     const specifiedCategories = JSON.stringify(this.specifiedCategories);
 
-    if (specifiedCategories !== this.setting(['pianotell-flamoji.specify_categories'])()) {
+    if (specifiedCategories !== app.data.settings['pianotell-flamoji.specify_categories']) {
       dirty['pianotell-flamoji.specify_categories'] = specifiedCategories;
     }
 
@@ -89,7 +77,7 @@ app.initializers.add('pianotell-flamoji', (app) => {
                 {app.translator.trans('pianotell-flamoji.admin.settings.show_preview_label')}
               </Switch>
             </div>
-            <div className="helpText" />
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.show_preview_text')}</div>
           </div>
           <div className="Flamoji--generalUISetting">
             <div className="Form-group">
@@ -100,7 +88,7 @@ app.initializers.add('pianotell-flamoji', (app) => {
                 {app.translator.trans('pianotell-flamoji.admin.settings.show_search_label')}
               </Switch>
             </div>
-            <div className="helpText" />
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.show_search_text')}</div>
           </div>
         </div>
 
@@ -150,7 +138,7 @@ app.initializers.add('pianotell-flamoji', (app) => {
                 {app.translator.trans('pianotell-flamoji.admin.settings.show_category_buttons_label')}
               </Switch>
             </div>
-            <div className="helpText" />
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.show_category_buttons_text')}</div>
           </div>
           <div className="Flamoji--categorySetting">
             <div className="Form-group">
@@ -161,15 +149,17 @@ app.initializers.add('pianotell-flamoji', (app) => {
                 {app.translator.trans('pianotell-flamoji.admin.settings.show_recents_label')}
               </Switch>
             </div>
-            <div className="helpText" />
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.show_recents_text')}</div>
           </div>
-          <div className="Flamoji--categorySetting recentsCountSetting">
-            <div className="Form-group recentsCountGroup">
-              <label>{app.translator.trans('pianotell-flamoji.admin.settings.frequent_rows_label')}</label>
-              <input className="FormControl" type="number" min="1" max="10" bidi={this.setting('pianotell-flamoji.frequent_rows')} />
+          {!!this.setting(['pianotell-flamoji.show_recents'])() && this.setting(['pianotell-flamoji.show_recents'])() !== '0' && (
+            <div className="Flamoji--categorySetting recentsCountSetting">
+              <div className="Form-group recentsCountGroup">
+                <label>{app.translator.trans('pianotell-flamoji.admin.settings.frequent_rows_label')}</label>
+                <input className="FormControl" type="number" min="1" max="10" bidi={this.setting('pianotell-flamoji.frequent_rows')} />
+              </div>
+              <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.frequent_rows_text')}</div>
             </div>
-            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.frequent_rows_text')}</div>
-          </div>
+          )}
           <div className="Flamoji--categorySetting specifyCategoriesSetting">
             <div className="Form-group specifyCategoriesGroup">
               <label>{app.translator.trans('pianotell-flamoji.admin.settings.specify_categories_label')}</label>

@@ -23,7 +23,7 @@ class ImportEmojiHandler
                     "data.$i."
                 );
             } catch (ValidationException $e) {
-                $errors = array_merge($errors, $e->errors());
+                $errors = array_merge($errors, $e->getAttributes());
             }
         }
         if (! empty($errors)) {
