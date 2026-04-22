@@ -1,5 +1,4 @@
 import { extend, override } from 'flarum/common/extend';
-import { availableLocale } from '@roderickhsiao/emoji-button-locale-data';
 
 import app from 'flarum/common/app';
 import AdminPage from 'flarum/admin/components/AdminPage';
@@ -15,18 +14,6 @@ import Switch from 'flarum/common/components/Switch';
 app.initializers.add('pianotell-flamoji', (app) => {
   app.store.models.emojis = Emoji;
   app.customEmojiListState = new CustomEmojiListState();
-
-  let initialCategoryOptions = {};
-
-  getEmojiCategories().forEach((category) => {
-    initialCategoryOptions[category] = app.translator.trans('pianotell-flamoji.admin.settings.emoji_categories.' + category);
-  });
-
-  let emojiDataOptions = {};
-
-  availableLocale.forEach((locale) => {
-    emojiDataOptions[locale] = locale;
-  });
 
   extend(ExtensionPage.prototype, ['oncreate', 'onupdate'], function () {
     if (this.extension.id != 'pianotell-flamoji') return;
@@ -133,45 +120,21 @@ app.initializers.add('pianotell-flamoji', (app) => {
           </div>
           <div className="Flamoji--emojiSetting">
             <div className="Form-group">
-              <label>{app.translator.trans('pianotell-flamoji.admin.settings.emoji_style_label')}</label>
-              <Select
-                value={this.setting(['pianotell-flamoji.emoji_style'])() || 'twemoji'}
-                options={{
-                  native: app.translator.trans('pianotell-flamoji.admin.settings.emoji_style_native_option'),
-                  twemoji: 'Twemoji',
-                }}
-                buttonClassName="Button"
-                onchange={this.settings['pianotell-flamoji.emoji_style']}
-              />
-            </div>
-            <div className="helpText" />
-          </div>
-          <div className="Flamoji--emojiSetting">
-            <div className="Form-group">
-              <label>{app.translator.trans('pianotell-flamoji.admin.settings.emoji_data_label')}</label>
-              <Select
-                value={this.setting(['pianotell-flamoji.emoji_data'])() || 'en'}
-                options={emojiDataOptions}
-                buttonClassName="Button"
-                onchange={this.settings['pianotell-flamoji.emoji_data']}
-              />
-            </div>
-            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.emoji_data_text')}</div>
-          </div>
-          <div className="Flamoji--emojiSetting">
-            <div className="Form-group">
               <label>{app.translator.trans('pianotell-flamoji.admin.settings.emoji_version_label')}</label>
               <Select
-                value={this.setting(['pianotell-flamoji.emoji_version'])() || '12.1'}
+                value={this.setting(['pianotell-flamoji.emoji_version'])() || '14'}
                 options={{
-                  '1.0': '1.0',
-                  '2.0': '2.0',
-                  '3.0': '3.0',
-                  '4.0': '4.0',
-                  '5.0': '5.0',
-                  '11.0': '11.0',
-                  '12.0': '12.0',
-                  12.1: '12.1',
+                  '1': '1.0',
+                  '2': '2.0',
+                  '3': '3.0',
+                  '4': '4.0',
+                  '5': '5.0',
+                  '11': '11.0',
+                  '12': '12.0',
+                  '12.1': '12.1',
+                  '13': '13.0',
+                  '13.1': '13.1',
+                  '14': '14.0',
                 }}
                 buttonClassName="Button"
                 onchange={this.settings['pianotell-flamoji.emoji_version']}
@@ -184,18 +147,6 @@ app.initializers.add('pianotell-flamoji', (app) => {
         <div className="Flamoji--categorySettingsContainer">
           <h3>{app.translator.trans('pianotell-flamoji.admin.settings.category_settings_heading')}</h3>
           <hr />
-          <div className="Flamoji--categorySetting">
-            <div className="Form-group">
-              <label>{app.translator.trans('pianotell-flamoji.admin.settings.initial_category_label')}</label>
-              <Select
-                value={this.setting(['pianotell-flamoji.initial_category'])() || 'smileys'}
-                options={initialCategoryOptions}
-                buttonClassName="Button"
-                onchange={this.settings['pianotell-flamoji.initial_category']}
-              />
-            </div>
-            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.initial_category_text')}</div>
-          </div>
           <div className="Flamoji--categorySetting">
             <div className="Form-group">
               <Switch
@@ -222,10 +173,10 @@ app.initializers.add('pianotell-flamoji', (app) => {
           </div>
           <div className="Flamoji--categorySetting recentsCountSetting">
             <div className="Form-group recentsCountGroup">
-              <label>{app.translator.trans('pianotell-flamoji.admin.settings.recents_count_label')}</label>
-              <input className="FormControl" type="number" bidi={this.setting('pianotell-flamoji.recents_count')} />
+              <label>{app.translator.trans('pianotell-flamoji.admin.settings.frequent_rows_label')}</label>
+              <input className="FormControl" type="number" min="1" max="10" bidi={this.setting('pianotell-flamoji.frequent_rows')} />
             </div>
-            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.recents_count_text')}</div>
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.frequent_rows_text')}</div>
           </div>
           <div className="Flamoji--categorySetting specifyCategoriesSetting">
             <div className="Form-group specifyCategoriesGroup">
@@ -262,4 +213,27 @@ app.initializers.add('pianotell-flamoji', (app) => {
       </div>
     );
   });
+});
+
+// Forward-compat: see js/src/forum/index.js for the same pattern. Exposes
+// our admin extension surface so 2.x's Export Registry (and any future
+// extension that wants to extend our admin UI) can reach it.
+import CustomEmojiList_ from './components/CustomEmojiList';
+import CustomEmojiSection_ from './components/CustomEmojiSection';
+import EditEmojiModal_ from './components/EditEmojiModal';
+import CustomEmojiListState_ from './states/CustomEmojiListState';
+import Emoji_ from '../common/models/Emoji';
+
+export default Object.freeze({
+  components: {
+    CustomEmojiList: CustomEmojiList_,
+    CustomEmojiSection: CustomEmojiSection_,
+    EditEmojiModal: EditEmojiModal_,
+  },
+  states: {
+    CustomEmojiListState: CustomEmojiListState_,
+  },
+  models: {
+    Emoji: Emoji_,
+  },
 });

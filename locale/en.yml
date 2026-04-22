@@ -18,26 +18,19 @@ pianotell-flamoji:
       show_category_buttons_label: Show category buttons
       show_search_label: Show search input
       show_recents_label: Show (and save) most recently used emojis
-      recents_count_label: Recently used emoji count
-      recents_count_text: The number of recent emojis to save.
-      emoji_style_label: Emoji style
+      frequent_rows_label: Frequent emoji rows
+      frequent_rows_text: Number of rows of recently/frequently used emojis to display at the top of the picker (1-10).
       emoji_version_label: Emoji version
-      emoji_version_text: The version of the Emoji specification to use.
-      initial_category_label: Initial category
-      initial_category_text: By default, the picker starts out showing the Smileys & Emotion category.
+      emoji_version_text: The version of the Unicode emoji specification to use. Newer versions include more emoji.
       specify_categories_label: Specify categories
       specify_categories_text: You can specify a list of categories here, and the picker will only show those categories.
-      emoji_data_label: Emoji data
-      emoji_data_text: This is typically used for providing translated emoji names.
-      emoji_style_native_option: Native
 
       emoji_categories:
-        smileys: => pianotell-flamoji.ref.emoji_categories.smileys
         people: => pianotell-flamoji.ref.emoji_categories.people
-        animals: => pianotell-flamoji.ref.emoji_categories.animals
-        food: => pianotell-flamoji.ref.emoji_categories.food
-        travel: => pianotell-flamoji.ref.emoji_categories.travel
-        activities: => pianotell-flamoji.ref.emoji_categories.activities
+        nature: => pianotell-flamoji.ref.emoji_categories.nature
+        foods: => pianotell-flamoji.ref.emoji_categories.foods
+        activity: => pianotell-flamoji.ref.emoji_categories.activity
+        places: => pianotell-flamoji.ref.emoji_categories.places
         objects: => pianotell-flamoji.ref.emoji_categories.objects
         symbols: => pianotell-flamoji.ref.emoji_categories.symbols
         flags: => pianotell-flamoji.ref.emoji_categories.flags
@@ -66,20 +59,36 @@ pianotell-flamoji:
     # These translations are used by the composer.
     composer:
       emoji_tooltip: Insert emoji
+      picker_load_error: Could not load the emoji picker. Please try again.
 
-    # These translations are used by the `emoji-button` package.
-    emoji-button:
+    # These translations are used by the `emoji-mart` package, fed via
+    # its `i18n` prop. Anything we don't override here falls back to
+    # emoji-mart's built-in English defaults.
+    emoji-mart:
       search_placeholder: Search Emojis
+      no_emojis_found_title: Oh no!
       no_emojis_found_message: No emojis found
+      pick: Pick an emoji
+      add_custom: Add custom emoji
+      category_search: Search Results
+      skin_tone_choose: Choose default skin tone
+      skin_tone_default: Default
+      skin_tone_light: Light
+      skin_tone_medium_light: Medium-Light
+      skin_tone_medium: Medium
+      skin_tone_medium_dark: Medium-Dark
+      skin_tone_dark: Dark
 
+      # Category labels are aliased into the `forum.*` namespace so they
+      # ship to the browser in `forum-en.js`. Keys under `ref.*` are
+      # server-side only; the JS picker can't read them directly.
       categories:
-        recents: => pianotell-flamoji.ref.emoji_categories.recents
-        smileys: => pianotell-flamoji.ref.emoji_categories.smileys
+        frequent: => pianotell-flamoji.ref.emoji_categories.frequent
         people: => pianotell-flamoji.ref.emoji_categories.people
-        animals: => pianotell-flamoji.ref.emoji_categories.animals
-        food: => pianotell-flamoji.ref.emoji_categories.food
-        travel: => pianotell-flamoji.ref.emoji_categories.travel
-        activities: => pianotell-flamoji.ref.emoji_categories.activities
+        nature: => pianotell-flamoji.ref.emoji_categories.nature
+        foods: => pianotell-flamoji.ref.emoji_categories.foods
+        activity: => pianotell-flamoji.ref.emoji_categories.activity
+        places: => pianotell-flamoji.ref.emoji_categories.places
         objects: => pianotell-flamoji.ref.emoji_categories.objects
         symbols: => pianotell-flamoji.ref.emoji_categories.symbols
         flags: => pianotell-flamoji.ref.emoji_categories.flags
@@ -93,13 +102,12 @@ pianotell-flamoji:
   ref:
     # Translations in this namespace are used to translate emoji categories.
     emoji_categories:
-      recents: Recent Emojis
-      smileys: Smileys & Emotion
-      people: People & Body
-      animals: Animals & Nature
-      food: Food & Drink
-      travel: Travel & Places
-      activities: Activities
+      frequent: Frequently Used
+      people: Smileys & People
+      nature: Animals & Nature
+      foods: Food & Drink
+      activity: Activities
+      places: Travel & Places
       objects: Objects
       symbols: Symbols
       flags: Flags

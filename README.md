@@ -17,13 +17,13 @@ Screenshots:
 
 ## Features
 
-- Based on [joeattardi/emoji-button](https://github.com/joeattardi/emoji-button) repository.
+- Built on [emoji-mart](https://github.com/missive/emoji-mart) (Missive, MIT). Originally based on [joeattardi/emoji-button](https://github.com/joeattardi/emoji-button) — migrated in this fork after the upstream picker was archived.
 - Add an emoji picker to the text editor (compatible with dark mode).
-- Show Twemoji or unicode emojis in the picker.
+- Show Twemoji glyphs in the picker (Unicode 14, sourced from a jsDelivr-hosted spritesheet).
 - Search emojis in your own language.
 - Add custom emojis to the picker.
 - Import and export custom emoji configurations.
-- Everything is dynamically loaded (no CDNs) when the picker is opened (there should be no performance impact until the user interacts with the picker).
+- Picker code and emoji data load lazily on first open (no impact on initial page load); image spritesheet is fetched from jsDelivr on first picker render.
 
 ## Installation
 

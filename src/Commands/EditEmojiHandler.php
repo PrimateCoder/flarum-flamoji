@@ -8,17 +8,11 @@ use Illuminate\Support\Arr;
 
 class EditEmojiHandler
 {
-    /**
-     * @param  EditEmoji $command
-     * @return Emoji
-     */
-    public function handle(EditEmoji $command)
+    public function handle(EditEmoji $command): Emoji
     {
-        $data = $command->data;
-
         $emoji = Emoji::findOrFail($command->emojiId);
 
-        $attributes = Arr::get($data, 'attributes', []);
+        $attributes = Arr::get($command->data, 'attributes', []);
         $errors = [];
 
         if (array_key_exists('title', $attributes)) {
@@ -27,10 +21,9 @@ class EditEmojiHandler
 
         if (array_key_exists('textToReplace', $attributes)) {
             $textToReplace = trim((string) $attributes['textToReplace']);
-            if ($textToReplace === '') {
-                $errors['textToReplace'] = 'The trigger text is required.';
-            } elseif (preg_match('/\s/u', $textToReplace)) {
-                $errors['textToReplace'] = 'The trigger text must not contain whitespace.';
+            $err = EmojiRules::validateTextToReplace($textToReplace, true);
+            if ($err !== null) {
+                $errors['textToReplace'] = $err;
             } else {
                 $emoji->text_to_replace = $textToReplace;
             }
@@ -38,8 +31,9 @@ class EditEmojiHandler
 
         if (array_key_exists('path', $attributes)) {
             $path = trim((string) $attributes['path']);
-            if ($path === '') {
-                $errors['path'] = 'The image path is required.';
+            $err = EmojiRules::validatePath($path, true);
+            if ($err !== null) {
+                $errors['path'] = $err;
             } else {
                 $emoji->path = $path;
             }

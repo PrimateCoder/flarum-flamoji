@@ -4,20 +4,20 @@
     "license": "MIT",
     "version": "0.0.0",
     "dependencies": {
-        "@joeattardi/emoji-button": "git://github.com/primatecoder/emoji-button",
-        "@roderickhsiao/emoji-button-locale-data": "^0.1.2",
+        "@emoji-mart/data": "^1.2.1",
         "copy-webpack-plugin": "^11.0.0",
+        "emoji-mart": "^5.6.0",
         "file-saver": "2.0.5",
         "flarum-webpack-config": "2.0.0",
         "webpack": "^5.75.0",
         "webpack-cli": "^5.0.1"
     },
     "devDependencies": {
-        "prettier": "^2.8.3",
+        "@flarum/prettier-config": "^1.0.0",
         "flarum-webpack-config": "^2.0.0",
+        "prettier": "^2.8.3",
         "webpack": "^5.75.0",
-        "webpack-cli": "^5.0.1",
-        "@flarum/prettier-config": "^1.0.0"
+        "webpack-cli": "^5.0.1"
     },
     "repository": {
         "type": "git",
