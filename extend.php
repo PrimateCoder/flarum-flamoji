@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the-turk/flarum-flamoji.
+ * This file is part of pianotell/flarum-ext-flamoji.
  *
  * Copyright (c) 2021 Hasan Özbey
  *
@@ -10,11 +10,11 @@
  * with this source code.
  */
 
-namespace TheTurk\Flamoji;
+namespace PianoTell\Flamoji;
 
 use Flarum\Extend;
 use s9e\TextFormatter\Configurator;
-use TheTurk\Flamoji\Api\Controllers;
+use PianoTell\Flamoji\Api\Controllers;
 
 return [
     (new Extend\Frontend('forum'))
@@ -31,23 +31,35 @@ return [
         ->configure(ConfigureTextFormatter::class),
 
     (new Extend\Routes('api'))
-        ->get('/the-turk/emojis', 'emojis.list', Controllers\ListEmojisController::class)
-        ->post('/the-turk/emojis', 'emojis.create', Controllers\CreateEmojiController::class)
-        ->post('/the-turk/import-emojis', 'emojis.import', Controllers\ImportEmojiController::class)
-        ->patch('/the-turk/emojis/{id}', 'emojis.update', Controllers\UpdateEmojiController::class)
-        ->delete('/the-turk/emojis/{id}', 'emojis.delete', Controllers\DeleteEmojiController::class),
+        ->get('/pianotell/emojis', 'emojis.list', Controllers\ListEmojisController::class)
+        ->post('/pianotell/emojis', 'emojis.create', Controllers\CreateEmojiController::class)
+        ->post('/pianotell/import-emojis', 'emojis.import', Controllers\ImportEmojiController::class)
+        ->patch('/pianotell/emojis/{id}', 'emojis.update', Controllers\UpdateEmojiController::class)
+        ->delete('/pianotell/emojis/{id}', 'emojis.delete', Controllers\DeleteEmojiController::class),
 
     (new Extend\Settings())
-        ->serializeToForum('flamoji.auto_hide', 'the-turk-flamoji.auto_hide', 'boolVal')
-        ->serializeToForum('flamoji.show_preview', 'the-turk-flamoji.show_preview', 'boolVal')
-        ->serializeToForum('flamoji.show_search', 'the-turk-flamoji.show_search', 'boolVal')
-        ->serializeToForum('flamoji.show_variants', 'the-turk-flamoji.show_variants', 'boolVal')
-        ->serializeToForum('flamoji.emoji_style', 'the-turk-flamoji.emoji_style')
-        ->serializeToForum('flamoji.emoji_data', 'the-turk-flamoji.emoji_data')
-        ->serializeToForum('flamoji.emoji_version', 'the-turk-flamoji.emoji_version')
-        ->serializeToForum('flamoji.initial_category', 'the-turk-flamoji.initial_category')
-        ->serializeToForum('flamoji.show_category_buttons', 'the-turk-flamoji.show_category_buttons', 'boolVal')
-        ->serializeToForum('flamoji.show_recents', 'the-turk-flamoji.show_recents', 'boolVal')
-        ->serializeToForum('flamoji.recents_count', 'the-turk-flamoji.recents_count', 'intVal')
-        ->serializeToForum('flamoji.specify_categories', 'the-turk-flamoji.specify_categories'),
+        ->default('pianotell-flamoji.auto_hide', true)
+        ->default('pianotell-flamoji.show_preview', false)
+        ->default('pianotell-flamoji.show_search', true)
+        ->default('pianotell-flamoji.show_variants', true)
+        ->default('pianotell-flamoji.emoji_style', 'twemoji')
+        ->default('pianotell-flamoji.emoji_data', 'en')
+        ->default('pianotell-flamoji.emoji_version', '12.1')
+        ->default('pianotell-flamoji.initial_category', 'smileys')
+        ->default('pianotell-flamoji.show_category_buttons', true)
+        ->default('pianotell-flamoji.show_recents', true)
+        ->default('pianotell-flamoji.recents_count', 50)
+        ->default('pianotell-flamoji.specify_categories', '["smileys","people","animals","food","activities","travel","objects","symbols","flags"]')
+        ->serializeToForum('flamoji.auto_hide', 'pianotell-flamoji.auto_hide', 'boolVal')
+        ->serializeToForum('flamoji.show_preview', 'pianotell-flamoji.show_preview', 'boolVal')
+        ->serializeToForum('flamoji.show_search', 'pianotell-flamoji.show_search', 'boolVal')
+        ->serializeToForum('flamoji.show_variants', 'pianotell-flamoji.show_variants', 'boolVal')
+        ->serializeToForum('flamoji.emoji_style', 'pianotell-flamoji.emoji_style')
+        ->serializeToForum('flamoji.emoji_data', 'pianotell-flamoji.emoji_data')
+        ->serializeToForum('flamoji.emoji_version', 'pianotell-flamoji.emoji_version')
+        ->serializeToForum('flamoji.initial_category', 'pianotell-flamoji.initial_category')
+        ->serializeToForum('flamoji.show_category_buttons', 'pianotell-flamoji.show_category_buttons', 'boolVal')
+        ->serializeToForum('flamoji.show_recents', 'pianotell-flamoji.show_recents', 'boolVal')
+        ->serializeToForum('flamoji.recents_count', 'pianotell-flamoji.recents_count', 'intVal')
+        ->serializeToForum('flamoji.specify_categories', 'pianotell-flamoji.specify_categories'),
 ];

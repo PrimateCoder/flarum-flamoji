@@ -1,11 +1,12 @@
 <?php
 
-namespace TheTurk\Flamoji\Api\Controllers;
+namespace PianoTell\Flamoji\Api\Controllers;
 
 use Flarum\Api\Controller\AbstractListController;
 use Flarum\Http\UrlGenerator;
-use TheTurk\Flamoji\Api\Serializers\EmojiSerializer;
-use TheTurk\Flamoji\Models\Emoji;
+use Illuminate\Support\Arr;
+use PianoTell\Flamoji\Api\Serializers\EmojiSerializer;
+use PianoTell\Flamoji\Models\Emoji;
 use Psr\Http\Message\ServerRequestInterface;
 use Tobscure\JsonApi\Document;
 
@@ -36,28 +37,27 @@ class ListEmojisController extends AbstractListController
     {
         $params = $request->getQueryParams();
 
-        $limit = $this->extractLimit($request);
-
-        // This is a trick to be able to retrieve all
-        // emojis from the db. We need them to create a JSON file to export.
-        // -- need to think a better way to do this.
-        if ($limit == $this->limit) {
+        // Escape hatch: ?filter[all]=1 returns every emoji in one shot,
+        // used by the forum picker (which needs the full set to feed
+        // into EmojiButton's "custom" category) and by the admin's
+        // "export to JSON" flow. The list endpoint is public, and
+        // walking pages would yield the same data, so this is not
+        // permission-gated — it's just a round-trip optimization.
+        if (Arr::get($params, 'filter.all')) {
             return Emoji::all();
         }
 
+        $limit = $this->extractLimit($request);
         $offset = $this->extractOffset($request);
 
         $results = Emoji::skip($offset)->take($limit + 1)->orderBy('id', 'desc')->get();
 
-        // Check for more results
         $hasMoreResults = $limit > 0 && $results->count() > $limit;
 
-        // Pop
         if ($hasMoreResults) {
             $results->pop();
         }
 
-        // Add pagination to the request
         $document->addPaginationLinks(
             $this->url->to('api')->route('emojis.list'),
             $params,

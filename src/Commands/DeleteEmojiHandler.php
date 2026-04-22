@@ -1,8 +1,8 @@
 <?php
 
-namespace TheTurk\Flamoji\Commands;
+namespace PianoTell\Flamoji\Commands;
 
-use TheTurk\Flamoji\Models\Emoji;
+use PianoTell\Flamoji\Models\Emoji;
 
 class DeleteEmojiHandler
 {
@@ -12,7 +12,7 @@ class DeleteEmojiHandler
      */
     public function handle(DeleteEmoji $command)
     {
-        $emoji = Emoji::findOrFail($command->tagId);
+        $emoji = Emoji::findOrFail($command->emojiId);
 
         $emoji->delete();
 

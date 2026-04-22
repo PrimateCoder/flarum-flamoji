@@ -1,12 +1,12 @@
 # Flamoji
 
-[![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/the-turk/flarum-flamoji/blob/master/LICENSE) [![Latest Stable Version](https://img.shields.io/packagist/v/the-turk/flarum-flamoji.svg)](https://packagist.org/packages/the-turk/flarum-flamoji) [![Total Downloads](https://img.shields.io/packagist/dt/the-turk/flarum-flamoji.svg)](https://packagist.org/packages/the-turk/flarum-flamoji)
+[![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/PrimateCoder/flarum-flamoji/blob/master/LICENSE) [![Latest Stable Version](https://img.shields.io/packagist/v/pianotell/flarum-ext-flamoji.svg)](https://packagist.org/packages/pianotell/flarum-ext-flamoji) [![Total Downloads](https://img.shields.io/packagist/dt/pianotell/flarum-ext-flamoji.svg)](https://packagist.org/packages/pianotell/flarum-ext-flamoji)
 
 Simple emoji manager for Flarum.
 
-This fork includes fixes for [🎹 Piano | Tell](https://forum.pianotell.com).
+> **About this fork:** This is a maintained fork of [`the-turk/flarum-flamoji`](https://github.com/the-turk/flarum-flamoji) (originally by [Hasan Özbey](https://github.com/the-turk)), which is no longer maintained. This fork is published as `pianotell/flarum-ext-flamoji` and includes fixes and updates for [🎹 Piano | Tell](https://forum.pianotell.com). All credit for the original extension belongs to the original author.
 
-Note to self: cd js && npm install && npm run build
+> **Build note:** `cd js && npm install && npm run build`
 
 Screenshots:
 
@@ -28,13 +28,13 @@ Screenshots:
 ## Installation
 
 ```bash
-composer require the-turk/flarum-flamoji
+composer require pianotell/flarum-ext-flamoji
 ```
 
 ## Updating
 
 ```bash
-composer update the-turk/flarum-flamoji
+composer update pianotell/flarum-ext-flamoji
 php flarum migrate
 php flarum assets:publish
 php flarum cache:clear
@@ -46,7 +46,8 @@ I added these features so we can share our custom emoji configurations. Just use
 
 ## Links
 
-- [Source code on GitHub](https://github.com/the-turk/flarum-flamoji)
-- [Changelog](https://github.com/the-turk/blob/master/CHANGELOG.md)
-- [Report an issue](https://github.com/the-turk/flarum-flamoji/issues)
-- [Download via Packagist](https://packagist.org/packages/the-turk/flarum-flamoji)
+- [Source code on GitHub](https://github.com/PrimateCoder/flarum-flamoji)
+- [Changelog](https://github.com/PrimateCoder/flarum-flamoji/blob/main/CHANGELOG.md)
+- [Report an issue](https://github.com/PrimateCoder/flarum-flamoji/issues)
+- [Download via Packagist](https://packagist.org/packages/pianotell/flarum-ext-flamoji)
+- [Original (discontinued) project](https://github.com/the-turk/flarum-flamoji)

@@ -17,7 +17,7 @@ export default class CustomEmojiListState {
   loadResults(offset = 0) {
     this.loading = true;
 
-    return app.store.find('the-turk/emojis', { page: { limit: 23, offset } }).then(this.parseResults.bind(this));
+    return app.store.find('pianotell/emojis', { page: { limit: 23, offset } }).then(this.parseResults.bind(this));
   }
 
   /**

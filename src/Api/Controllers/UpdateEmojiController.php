@@ -1,10 +1,11 @@
 <?php
 
-namespace TheTurk\Flamoji\Api\Controllers;
+namespace PianoTell\Flamoji\Api\Controllers;
 
 use Flarum\Api\Controller\AbstractShowController;
-use TheTurk\Flamoji\Api\Serializers\EmojiSerializer;
-use TheTurk\Flamoji\Commands\EditEmoji;
+use Flarum\Http\RequestUtil;
+use PianoTell\Flamoji\Api\Serializers\EmojiSerializer;
+use PianoTell\Flamoji\Commands\EditEmoji;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\Arr;
 use Psr\Http\Message\ServerRequestInterface;
@@ -35,6 +36,8 @@ class UpdateEmojiController extends AbstractShowController
      */
     protected function data(ServerRequestInterface $request, Document $document)
     {
+        RequestUtil::getActor($request)->assertAdmin();
+
         $id = Arr::get($request->getQueryParams(), 'id');
         $data = Arr::get($request->getParsedBody(), 'data', []);
 

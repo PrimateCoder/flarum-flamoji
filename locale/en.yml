@@ -1,4 +1,4 @@
-the-turk-flamoji:
+pianotell-flamoji:
   ##
   # UNIQUE KEYS - The following keys are used in only one location each.
   ##
@@ -32,15 +32,15 @@ the-turk-flamoji:
       emoji_style_native_option: Native
 
       emoji_categories:
-        smileys: => the-turk-flamoji.ref.emoji_categories.smileys
-        people: => the-turk-flamoji.ref.emoji_categories.people
-        animals: => the-turk-flamoji.ref.emoji_categories.animals
-        food: => the-turk-flamoji.ref.emoji_categories.food
-        travel: => the-turk-flamoji.ref.emoji_categories.travel
-        activities: => the-turk-flamoji.ref.emoji_categories.activities
-        objects: => the-turk-flamoji.ref.emoji_categories.objects
-        symbols: => the-turk-flamoji.ref.emoji_categories.symbols
-        flags: => the-turk-flamoji.ref.emoji_categories.flags
+        smileys: => pianotell-flamoji.ref.emoji_categories.smileys
+        people: => pianotell-flamoji.ref.emoji_categories.people
+        animals: => pianotell-flamoji.ref.emoji_categories.animals
+        food: => pianotell-flamoji.ref.emoji_categories.food
+        travel: => pianotell-flamoji.ref.emoji_categories.travel
+        activities: => pianotell-flamoji.ref.emoji_categories.activities
+        objects: => pianotell-flamoji.ref.emoji_categories.objects
+        symbols: => pianotell-flamoji.ref.emoji_categories.symbols
+        flags: => pianotell-flamoji.ref.emoji_categories.flags
 
     custom_emojis_section:
       heading_title: Custom Emojis
@@ -73,17 +73,17 @@ the-turk-flamoji:
       no_emojis_found_message: No emojis found
 
       categories:
-        recents: => the-turk-flamoji.ref.emoji_categories.recents
-        smileys: => the-turk-flamoji.ref.emoji_categories.smileys
-        people: => the-turk-flamoji.ref.emoji_categories.people
-        animals: => the-turk-flamoji.ref.emoji_categories.animals
-        food: => the-turk-flamoji.ref.emoji_categories.food
-        travel: => the-turk-flamoji.ref.emoji_categories.travel
-        activities: => the-turk-flamoji.ref.emoji_categories.activities
-        objects: => the-turk-flamoji.ref.emoji_categories.objects
-        symbols: => the-turk-flamoji.ref.emoji_categories.symbols
-        flags: => the-turk-flamoji.ref.emoji_categories.flags
-        custom: => the-turk-flamoji.ref.emoji_categories.custom
+        recents: => pianotell-flamoji.ref.emoji_categories.recents
+        smileys: => pianotell-flamoji.ref.emoji_categories.smileys
+        people: => pianotell-flamoji.ref.emoji_categories.people
+        animals: => pianotell-flamoji.ref.emoji_categories.animals
+        food: => pianotell-flamoji.ref.emoji_categories.food
+        travel: => pianotell-flamoji.ref.emoji_categories.travel
+        activities: => pianotell-flamoji.ref.emoji_categories.activities
+        objects: => pianotell-flamoji.ref.emoji_categories.objects
+        symbols: => pianotell-flamoji.ref.emoji_categories.symbols
+        flags: => pianotell-flamoji.ref.emoji_categories.flags
+        custom: => pianotell-flamoji.ref.emoji_categories.custom
 
   ##
   # REUSED TRANSLATIONS - These keys should not be used directly in code!

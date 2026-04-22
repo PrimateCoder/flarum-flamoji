@@ -1,8 +1,9 @@
 <?php
 
-namespace TheTurk\Flamoji\Commands;
+namespace PianoTell\Flamoji\Commands;
 
-use TheTurk\Flamoji\Models\Emoji;
+use Flarum\Foundation\ValidationException;
+use PianoTell\Flamoji\Models\Emoji;
 use Illuminate\Support\Arr;
 
 class CreateEmojiHandler
@@ -15,11 +16,24 @@ class CreateEmojiHandler
     {
         $data = $command->data;
 
-        $emoji = Emoji::build(
-            Arr::get($data, 'attributes.title'),
-            Arr::get($data, 'attributes.textToReplace'),
-            Arr::get($data, 'attributes.path')
-        );
+        $title = trim((string) Arr::get($data, 'attributes.title', ''));
+        $textToReplace = trim((string) Arr::get($data, 'attributes.textToReplace', ''));
+        $path = trim((string) Arr::get($data, 'attributes.path', ''));
+
+        $errors = [];
+        if ($textToReplace === '') {
+            $errors['textToReplace'] = 'The trigger text is required.';
+        } elseif (preg_match('/\s/u', $textToReplace)) {
+            $errors['textToReplace'] = 'The trigger text must not contain whitespace.';
+        }
+        if ($path === '') {
+            $errors['path'] = 'The image path is required.';
+        }
+        if (! empty($errors)) {
+            throw new ValidationException($errors);
+        }
+
+        $emoji = Emoji::build($title, $textToReplace, $path);
 
         $emoji->save();
 

@@ -1,8 +1,9 @@
+import app from 'flarum/common/app';
 import Alert from 'flarum/common/components/Alert';
-import Button from 'flarum/components/Button';
-import Modal from 'flarum/components/Modal';
-import ItemList from 'flarum/utils/ItemList';
-import Stream from 'flarum/utils/Stream';
+import Button from 'flarum/common/components/Button';
+import Modal from 'flarum/common/components/Modal';
+import ItemList from 'flarum/common/utils/ItemList';
+import Stream from 'flarum/common/utils/Stream';
 import urlChecker from '../../common/utils/urlChecker';
 
 /**
@@ -33,7 +34,7 @@ export default class EditEmojiModal extends Modal {
       ? this.path()
         ? [m('img', { className: 'EditEmojiModal-titleEmoji', src: url, alt: this.emojiTitle() }), this.emojiTitle()]
         : this.emojiTitle()
-      : app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.edit_emoji.modal_title');
+      : app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.modal_title');
   }
 
   content() {
@@ -50,7 +51,7 @@ export default class EditEmojiModal extends Modal {
     items.add(
       'title',
       <div className="Form-group">
-        <label>{app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.edit_emoji.emoji_title_label')}</label>
+        <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.emoji_title_label')}</label>
         <input className="FormControl" bidi={this.emojiTitle} />
       </div>,
       50
@@ -59,7 +60,7 @@ export default class EditEmojiModal extends Modal {
     items.add(
       'textToReplace',
       <div className="Form-group">
-        <label>{app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.edit_emoji.text_to_replace_label')}</label>
+        <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.text_to_replace_label')}</label>
         <input className="FormControl" bidi={this.textToReplace} />
       </div>,
       40
@@ -68,7 +69,7 @@ export default class EditEmojiModal extends Modal {
     items.add(
       'path',
       <div className="Form-group">
-        <label>{app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.edit_emoji.path_or_url_label')}</label>
+        <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.path_or_url_label')}</label>
         <input className="FormControl" placeholder="/assets/emojis/batman.png" bidi={this.path} />
       </div>,
       30
@@ -83,11 +84,11 @@ export default class EditEmojiModal extends Modal {
             className: 'Button Button--primary EditEmojiModal-save',
             loading: this.loading,
           },
-          app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.edit_emoji.submit_button')
+          app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.submit_button')
         )}
         {this.emoji.exists ? (
           <button type="button" className="Button EditEmojiModal-delete" onclick={this.delete.bind(this)}>
-            {app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.edit_emoji.delete_emoji_button')}
+            {app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.delete_emoji_button')}
           </button>
         ) : (
           ''
@@ -113,30 +114,63 @@ export default class EditEmojiModal extends Modal {
 
     const exists = this.emoji.exists;
 
-    this.emoji.save(this.submitData()).then((emoji) => {
-      this.clearCache().then(() => {
-        this.hide();
+    this.emoji
+      .save(this.submitData())
+      .then((emoji) => {
         if (!exists) app.customEmojiListState.addToList(emoji);
-        this.loading = false;
+        // Cache clearing is best-effort: the formatter cache is keyed
+        // and will be regenerated on next request, so a failure here
+        // (e.g. transient permission issue on storage/cache) shouldn't
+        // block the user. Surface it as a non-fatal warning.
+        return this.clearCache().catch((err) => this.showCacheClearWarning(err));
+      })
+      .then(() => {
+        this.hide();
         this.showSuccessMessage();
+      })
+      .catch(this.onerror.bind(this))
+      .then(() => {
+        this.loading = false;
+        m.redraw();
       });
-    });
   }
 
   delete() {
-    if (confirm(app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.edit_emoji.delete_emoji_confirmation'))) {
-      this.emoji.delete().then(() => {
-        this.clearCache().then(() => {
-          this.hide();
-          app.customEmojiListState.removeFromList(this.emoji.id());
-          this.showSuccessMessage();
-        });
-      });
+    if (!confirm(app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.delete_emoji_confirmation'))) {
+      return;
     }
+
+    this.loading = true;
+
+    this.emoji
+      .delete()
+      .then(() => {
+        app.customEmojiListState.removeFromList(this.emoji.id());
+        return this.clearCache().catch((err) => this.showCacheClearWarning(err));
+      })
+      .then(() => {
+        this.hide();
+        this.showSuccessMessage();
+      })
+      .catch(this.onerror.bind(this))
+      .then(() => {
+        this.loading = false;
+        m.redraw();
+      });
   }
 
   showSuccessMessage() {
-    return app.alerts.show(Alert, { type: 'success' }, app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.edit_emoji.saved_message'));
+    return app.alerts.show(Alert, { type: 'success' }, app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.saved_message'));
+  }
+
+  showCacheClearWarning(err) {
+    // eslint-disable-next-line no-console
+    console.warn('Flamoji: failed to clear formatter cache after emoji change', err);
+    app.alerts.show(
+      Alert,
+      { type: 'warning' },
+      'Saved, but the formatter cache could not be cleared automatically. New emoji may take a moment to render in existing posts.'
+    );
   }
 
   // Seems like we need to clear cache

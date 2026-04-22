@@ -1,9 +1,9 @@
 <?php
 
-namespace TheTurk\Flamoji\Api\Serializers;
+namespace PianoTell\Flamoji\Api\Serializers;
 
 use Flarum\Api\Serializer\AbstractSerializer;
-use TheTurk\Flamoji\Emoji;
+use PianoTell\Flamoji\Models\Emoji;
 
 class EmojiSerializer extends AbstractSerializer
 {

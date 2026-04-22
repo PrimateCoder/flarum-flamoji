@@ -1,8 +1,9 @@
 <?php
 
-namespace TheTurk\Flamoji\Commands;
+namespace PianoTell\Flamoji\Commands;
 
-use TheTurk\Flamoji\Models\Emoji;
+use Flarum\Foundation\ValidationException;
+use PianoTell\Flamoji\Models\Emoji;
 use Illuminate\Support\Arr;
 
 class EditEmojiHandler
@@ -18,17 +19,34 @@ class EditEmojiHandler
         $emoji = Emoji::findOrFail($command->emojiId);
 
         $attributes = Arr::get($data, 'attributes', []);
+        $errors = [];
 
-        if (isset($attributes['title'])) {
-            $emoji->title = $attributes['title'];
+        if (array_key_exists('title', $attributes)) {
+            $emoji->title = trim((string) $attributes['title']);
         }
 
-        if (isset($attributes['textToReplace'])) {
-            $emoji->text_to_replace = $attributes['textToReplace'];
+        if (array_key_exists('textToReplace', $attributes)) {
+            $textToReplace = trim((string) $attributes['textToReplace']);
+            if ($textToReplace === '') {
+                $errors['textToReplace'] = 'The trigger text is required.';
+            } elseif (preg_match('/\s/u', $textToReplace)) {
+                $errors['textToReplace'] = 'The trigger text must not contain whitespace.';
+            } else {
+                $emoji->text_to_replace = $textToReplace;
+            }
         }
 
-        if (isset($attributes['path'])) {
-            $emoji->path = $attributes['path'];
+        if (array_key_exists('path', $attributes)) {
+            $path = trim((string) $attributes['path']);
+            if ($path === '') {
+                $errors['path'] = 'The image path is required.';
+            } else {
+                $emoji->path = $path;
+            }
+        }
+
+        if (! empty($errors)) {
+            throw new ValidationException($errors);
         }
 
         $emoji->save();

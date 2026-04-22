@@ -1,5 +1,6 @@
 import { saveAs } from 'file-saver';
 import Button from 'flarum/common/components/Button';
+import app from 'flarum/common/app';
 import Component from 'flarum/common/Component';
 import CustomEmojiList from './CustomEmojiList';
 import EditEmojiModal from './EditEmojiModal';
@@ -14,7 +15,7 @@ export default class CustomEmojiSection extends Component {
   exportEmojiList() {
     var customEmojiList = {};
 
-    app.store.find('the-turk/emojis').then((results) => {
+    app.store.find('pianotell/emojis', { filter: { all: 1 } }).then((results) => {
       results.payload.data.map((emoji, i) => {
         const attr = emoji.attributes;
 
@@ -31,7 +32,7 @@ export default class CustomEmojiSection extends Component {
   }
 
   importEmojiList() {
-    if (!confirm(app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.import_emojis_message'))) return;
+    if (!confirm(app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.import_emojis_message'))) return;
 
     var input = document.createElement('input');
     input.type = 'file';
@@ -51,7 +52,7 @@ export default class CustomEmojiSection extends Component {
         app
           .request({
             method: 'POST',
-            url: `${app.forum.attribute('apiUrl')}/the-turk/import-emojis`,
+            url: `${app.forum.attribute('apiUrl')}/pianotell/import-emojis`,
             body: { data: JSON.parse(readerEvent.target.result) },
           })
           .then(() => {
@@ -69,14 +70,14 @@ export default class CustomEmojiSection extends Component {
     items.add(
       'import',
       <Button icon="fas fa-sign-in-alt" onclick={() => this.importEmojiList()}>
-        {app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.import_json_button')}
+        {app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.import_json_button')}
       </Button>
     );
 
     items.add(
       'export',
       <Button icon="fas fa-share" onclick={() => this.exportEmojiList()}>
-        {app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.export_json_button')}
+        {app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.export_json_button')}
       </Button>
     );
 
@@ -90,7 +91,7 @@ export default class CustomEmojiSection extends Component {
           <div className="container">
             <div className="ExtensionTitle">
               <div className="ExtensionName">
-                <h2>{app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.heading_title')}</h2>
+                <h2>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.heading_title')}</h2>
               </div>
               <div class="ExtensionPage-headerTopItems">
                 <ul>{listItems(this.flamojiTopItems().toArray())}</ul>

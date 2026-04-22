@@ -1,6 +1,6 @@
 <?php
 
-namespace TheTurk\Flamoji\Models;
+namespace PianoTell\Flamoji\Models;
 
 use Flarum\Database\AbstractModel;
 

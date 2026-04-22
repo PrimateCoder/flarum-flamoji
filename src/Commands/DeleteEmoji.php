@@ -1,6 +1,6 @@
 <?php
 
-namespace TheTurk\Flamoji\Commands;
+namespace PianoTell\Flamoji\Commands;
 
 class DeleteEmoji
 {
@@ -12,10 +12,10 @@ class DeleteEmoji
     public $emojiId;
 
     /**
-     * @param int $tagId The ID of the emoji to delete.
+     * @param int $emojiId The ID of the emoji to delete.
      */
-    public function __construct($tagId)
+    public function __construct($emojiId)
     {
-        $this->tagId = $tagId;
+        $this->emojiId = $emojiId;
     }
 }

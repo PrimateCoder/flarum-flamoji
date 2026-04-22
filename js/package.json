@@ -1,5 +1,5 @@
 {
-    "name": "@the-turk/flarum-flamoji",
+    "name": "@pianotell/flarum-ext-flamoji",
     "description": "Simple emoji manager for Flarum. This fork includes fixes for https://forum.pianotell.com/.",
     "license": "MIT",
     "version": "0.0.0",

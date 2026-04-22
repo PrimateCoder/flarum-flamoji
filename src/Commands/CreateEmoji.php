@@ -1,6 +1,6 @@
 <?php
 
-namespace TheTurk\Flamoji\Commands;
+namespace PianoTell\Flamoji\Commands;
 
 class CreateEmoji
 {

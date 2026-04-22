@@ -1,6 +1,6 @@
 {
-    "name": "the-turk/flarum-flamoji",
-    "description": "Simple emoji manager for Flarum. This fork includes fixes for https://forum.pianotell.com/.",
+    "name": "pianotell/flarum-ext-flamoji",
+    "description": "Simple emoji manager for Flarum. Maintained fork of the-turk/flarum-flamoji (discontinued) with fixes for https://forum.pianotell.com/.",
     "keywords": [
         "flarum",
         "emoji",
@@ -10,24 +10,33 @@
     "license": "MIT",
     "authors": [
         {
+            "name": "Navindra Umanee",
+            "email": "navindra@cs.mcgill.ca",
+            "homepage": "https://www.cs.mcgill.ca/~navindra/",
+            "role": "Fork maintainer"
+        },
+        {
             "name": "Hasan Özbey",
             "email": "hasanoozbey@gmail.com",
-            "homepage": "https://github.com/the-turk"
+            "homepage": "https://github.com/the-turk",
+            "role": "Original author"
         }
     ],
     "support": {
-        "issues": "https://github.com/the-turk/flarum-flamoji/issues",
-        "source": "https://github.com/the-turk/flarum-flamoji"
+        "issues": "https://github.com/PrimateCoder/flarum-flamoji/issues",
+        "source": "https://github.com/PrimateCoder/flarum-flamoji"
     },
     "require": {
-        "flarum/core": "^1.2.0"
+        "php": ">=8.0",
+        "flarum/core": "^1.8.0"
     },
     "conflict": {
-        "clarkwinkelmann/flarum-ext-emojionearea": "*"
+        "clarkwinkelmann/flarum-ext-emojionearea": "*",
+        "the-turk/flarum-flamoji": "*"
     },
     "autoload": {
         "psr-4": {
-            "TheTurk\\Flamoji\\": "src/"
+            "PianoTell\\Flamoji\\": "src/"
         }
     },
     "extra": {

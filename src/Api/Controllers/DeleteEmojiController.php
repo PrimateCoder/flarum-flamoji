@@ -1,9 +1,10 @@
 <?php
 
-namespace TheTurk\Flamoji\Api\Controllers;
+namespace PianoTell\Flamoji\Api\Controllers;
 
 use Flarum\Api\Controller\AbstractDeleteController;
-use TheTurk\Flamoji\Commands\DeleteEmoji;
+use Flarum\Http\RequestUtil;
+use PianoTell\Flamoji\Commands\DeleteEmoji;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\Arr;
 use Psr\Http\Message\ServerRequestInterface;
@@ -28,6 +29,8 @@ class DeleteEmojiController extends AbstractDeleteController
      */
     protected function delete(ServerRequestInterface $request)
     {
+        RequestUtil::getActor($request)->assertAdmin();
+
         $this->bus->dispatch(
             new DeleteEmoji(Arr::get($request->getQueryParams(), 'id'))
         );

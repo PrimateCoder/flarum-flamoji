@@ -1,42 +1,36 @@
 <?php
 
-namespace TheTurk\Flamoji\Api\Controllers;
+namespace PianoTell\Flamoji\Api\Controllers;
 
-use Flarum\Api\Controller\AbstractCreateController;
-use TheTurk\Flamoji\Api\Serializers\EmojiSerializer;
-use TheTurk\Flamoji\Commands\ImportEmoji;
+use Flarum\Http\RequestUtil;
+use PianoTell\Flamoji\Commands\ImportEmoji;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\Arr;
+use Laminas\Diactoros\Response\EmptyResponse;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Tobscure\JsonApi\Document;
+use Psr\Http\Server\RequestHandlerInterface;
 
-class ImportEmojiController extends AbstractCreateController
+class ImportEmojiController implements RequestHandlerInterface
 {
-    /**
-     * {@inheritdoc}
-     */
-    public $serializer = EmojiSerializer::class;
-
     /**
      * @var Dispatcher
      */
     protected $bus;
 
-    /**
-     * @param Dispatcher $bus
-     */
     public function __construct(Dispatcher $bus)
     {
         $this->bus = $bus;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    protected function data(ServerRequestInterface $request, Document $document)
+    public function handle(ServerRequestInterface $request): ResponseInterface
     {
-        return $this->bus->dispatch(
+        RequestUtil::getActor($request)->assertAdmin();
+
+        $this->bus->dispatch(
             new ImportEmoji(Arr::get($request->getParsedBody(), 'data', []))
         );
+
+        return new EmptyResponse(204);
     }
 }

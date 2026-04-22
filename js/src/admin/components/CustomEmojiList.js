@@ -1,3 +1,4 @@
+import app from 'flarum/common/app';
 import Button from 'flarum/common/components/Button';
 import Component from 'flarum/common/Component';
 import EditEmojiModal from './EditEmojiModal';
@@ -55,7 +56,7 @@ export default class CustomEmojiList extends Component {
         {state.hasMoreResults() && (
           <div className="customEmoji-loadMore">
             <Button className="Button Button--primary" disabled={state.isLoading()} loading={state.isLoading()} onclick={() => state.loadMore()}>
-              {app.translator.trans('the-turk-flamoji.admin.custom_emojis_section.emoji_list.load_more_button')}
+              {app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.emoji_list.load_more_button')}
             </Button>
           </div>
         )}

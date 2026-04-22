@@ -12,14 +12,14 @@ import Select from 'flarum/common/components/Select';
 import Stream from 'flarum/common/utils/Stream';
 import Switch from 'flarum/common/components/Switch';
 
-app.initializers.add('the-turk-flamoji', (app) => {
+app.initializers.add('pianotell-flamoji', (app) => {
   app.store.models.emojis = Emoji;
   app.customEmojiListState = new CustomEmojiListState();
 
   let initialCategoryOptions = {};
 
   getEmojiCategories().forEach((category) => {
-    initialCategoryOptions[category] = app.translator.trans('the-turk-flamoji.admin.settings.emoji_categories.' + category);
+    initialCategoryOptions[category] = app.translator.trans('pianotell-flamoji.admin.settings.emoji_categories.' + category);
   });
 
   let emojiDataOptions = {};
@@ -29,11 +29,11 @@ app.initializers.add('the-turk-flamoji', (app) => {
   });
 
   extend(ExtensionPage.prototype, ['oncreate', 'onupdate'], function () {
-    if (this.extension.id != 'the-turk-flamoji') return;
+    if (this.extension.id != 'pianotell-flamoji') return;
 
     const $recentsCountSetting = this.$('.recentsCountSetting');
 
-    if (!this.setting(['the-turk-flamoji.show_recents'])()) {
+    if (!this.setting(['pianotell-flamoji.show_recents'])()) {
       $recentsCountSetting.hide();
     } else {
       $recentsCountSetting.show();
@@ -41,13 +41,13 @@ app.initializers.add('the-turk-flamoji', (app) => {
   });
 
   extend(ExtensionPage.prototype, 'oninit', function () {
-    if (this.extension.id != 'the-turk-flamoji') return;
+    if (this.extension.id != 'pianotell-flamoji') return;
 
-    this.specifiedCategories = Stream(JSON.parse(this.setting(['the-turk-flamoji.specify_categories'])() || []))();
+    this.specifiedCategories = Stream(JSON.parse(this.setting(['pianotell-flamoji.specify_categories'])() || []))();
   });
 
   extend(ExtensionPage.prototype, 'sections', function (items) {
-    if (this.extension.id != 'the-turk-flamoji') return;
+    if (this.extension.id != 'pianotell-flamoji') return;
 
     items.has('permissions') ? items.remove('permissions') : '';
 
@@ -55,14 +55,14 @@ app.initializers.add('the-turk-flamoji', (app) => {
   });
 
   override(AdminPage.prototype, 'dirty', function (original) {
-    if (!this.extension || this.extension.id != 'the-turk-flamoji') return original();
+    if (!this.extension || this.extension.id != 'pianotell-flamoji') return original();
 
     const dirty = {};
 
     const specifiedCategories = JSON.stringify(this.specifiedCategories);
 
-    if (specifiedCategories !== this.setting(['the-turk-flamoji.specify_categories'])()) {
-      dirty['the-turk-flamoji.specify_categories'] = specifiedCategories;
+    if (specifiedCategories !== this.setting(['pianotell-flamoji.specify_categories'])()) {
+      dirty['pianotell-flamoji.specify_categories'] = specifiedCategories;
     }
 
     Object.keys(this.settings).forEach((key) => {
@@ -76,30 +76,30 @@ app.initializers.add('the-turk-flamoji', (app) => {
     return dirty;
   });
 
-  app.extensionData.for('the-turk-flamoji').registerSetting(function () {
+  app.extensionData.for('pianotell-flamoji').registerSetting(function () {
     return (
       <div className="Flamoji--settingsContainer">
         <div className="Flamoji--generalUISettingsContainer">
-          <h3>{app.translator.trans('the-turk-flamoji.admin.settings.general_ui_settings_heading')}</h3>
+          <h3>{app.translator.trans('pianotell-flamoji.admin.settings.general_ui_settings_heading')}</h3>
           <hr />
           <div className="Flamoji--generalUISetting">
             <div className="Form-group">
               <Switch
-                state={!!this.setting(['the-turk-flamoji.auto_hide'])() && this.setting(['the-turk-flamoji.auto_hide'])() !== '0'}
-                onchange={this.settings['the-turk-flamoji.auto_hide']}
+                state={!!this.setting(['pianotell-flamoji.auto_hide'])() && this.setting(['pianotell-flamoji.auto_hide'])() !== '0'}
+                onchange={this.settings['pianotell-flamoji.auto_hide']}
               >
-                {app.translator.trans('the-turk-flamoji.admin.settings.auto_hide_label')}
+                {app.translator.trans('pianotell-flamoji.admin.settings.auto_hide_label')}
               </Switch>
             </div>
-            <div className="helpText">{app.translator.trans('the-turk-flamoji.admin.settings.auto_hide_text')}</div>
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.auto_hide_text')}</div>
           </div>
           <div className="Flamoji--generalUISetting">
             <div className="Form-group">
               <Switch
-                state={!!this.setting(['the-turk-flamoji.show_preview'])() && this.setting(['the-turk-flamoji.show_preview'])() !== '0'}
-                onchange={this.settings['the-turk-flamoji.show_preview']}
+                state={!!this.setting(['pianotell-flamoji.show_preview'])() && this.setting(['pianotell-flamoji.show_preview'])() !== '0'}
+                onchange={this.settings['pianotell-flamoji.show_preview']}
               >
-                {app.translator.trans('the-turk-flamoji.admin.settings.show_preview_label')}
+                {app.translator.trans('pianotell-flamoji.admin.settings.show_preview_label')}
               </Switch>
             </div>
             <div className="helpText" />
@@ -107,10 +107,10 @@ app.initializers.add('the-turk-flamoji', (app) => {
           <div className="Flamoji--generalUISetting">
             <div className="Form-group">
               <Switch
-                state={!!this.setting(['the-turk-flamoji.show_search'])() && this.setting(['the-turk-flamoji.show_search'])() !== '0'}
-                onchange={this.settings['the-turk-flamoji.show_search']}
+                state={!!this.setting(['pianotell-flamoji.show_search'])() && this.setting(['pianotell-flamoji.show_search'])() !== '0'}
+                onchange={this.settings['pianotell-flamoji.show_search']}
               >
-                {app.translator.trans('the-turk-flamoji.admin.settings.show_search_label')}
+                {app.translator.trans('pianotell-flamoji.admin.settings.show_search_label')}
               </Switch>
             </div>
             <div className="helpText" />
@@ -118,51 +118,51 @@ app.initializers.add('the-turk-flamoji', (app) => {
         </div>
 
         <div className="Flamoji--emojiSettingsContainer">
-          <h3>{app.translator.trans('the-turk-flamoji.admin.settings.emoji_settings_heading')}</h3>
+          <h3>{app.translator.trans('pianotell-flamoji.admin.settings.emoji_settings_heading')}</h3>
           <hr />
           <div className="Flamoji--emojiSetting">
             <div className="Form-group">
               <Switch
-                state={!!this.setting(['the-turk-flamoji.show_variants'])() && this.setting(['the-turk-flamoji.show_variants'])() !== '0'}
-                onchange={this.settings['the-turk-flamoji.show_variants']}
+                state={!!this.setting(['pianotell-flamoji.show_variants'])() && this.setting(['pianotell-flamoji.show_variants'])() !== '0'}
+                onchange={this.settings['pianotell-flamoji.show_variants']}
               >
-                {app.translator.trans('the-turk-flamoji.admin.settings.show_variants_label')}
+                {app.translator.trans('pianotell-flamoji.admin.settings.show_variants_label')}
               </Switch>
             </div>
-            <div className="helpText">{app.translator.trans('the-turk-flamoji.admin.settings.show_variants_text')}</div>
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.show_variants_text')}</div>
           </div>
           <div className="Flamoji--emojiSetting">
             <div className="Form-group">
-              <label>{app.translator.trans('the-turk-flamoji.admin.settings.emoji_style_label')}</label>
+              <label>{app.translator.trans('pianotell-flamoji.admin.settings.emoji_style_label')}</label>
               <Select
-                value={this.setting(['the-turk-flamoji.emoji_style'])() || 'twemoji'}
+                value={this.setting(['pianotell-flamoji.emoji_style'])() || 'twemoji'}
                 options={{
-                  native: app.translator.trans('the-turk-flamoji.admin.settings.emoji_style_native_option'),
+                  native: app.translator.trans('pianotell-flamoji.admin.settings.emoji_style_native_option'),
                   twemoji: 'Twemoji',
                 }}
                 buttonClassName="Button"
-                onchange={this.settings['the-turk-flamoji.emoji_style']}
+                onchange={this.settings['pianotell-flamoji.emoji_style']}
               />
             </div>
             <div className="helpText" />
           </div>
           <div className="Flamoji--emojiSetting">
             <div className="Form-group">
-              <label>{app.translator.trans('the-turk-flamoji.admin.settings.emoji_data_label')}</label>
+              <label>{app.translator.trans('pianotell-flamoji.admin.settings.emoji_data_label')}</label>
               <Select
-                value={this.setting(['the-turk-flamoji.emoji_data'])() || 'en'}
+                value={this.setting(['pianotell-flamoji.emoji_data'])() || 'en'}
                 options={emojiDataOptions}
                 buttonClassName="Button"
-                onchange={this.settings['the-turk-flamoji.emoji_data']}
+                onchange={this.settings['pianotell-flamoji.emoji_data']}
               />
             </div>
-            <div className="helpText">{app.translator.trans('the-turk-flamoji.admin.settings.emoji_data_text')}</div>
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.emoji_data_text')}</div>
           </div>
           <div className="Flamoji--emojiSetting">
             <div className="Form-group">
-              <label>{app.translator.trans('the-turk-flamoji.admin.settings.emoji_version_label')}</label>
+              <label>{app.translator.trans('pianotell-flamoji.admin.settings.emoji_version_label')}</label>
               <Select
-                value={this.setting(['the-turk-flamoji.emoji_version'])() || '12.1'}
+                value={this.setting(['pianotell-flamoji.emoji_version'])() || '12.1'}
                 options={{
                   '1.0': '1.0',
                   '2.0': '2.0',
@@ -174,37 +174,37 @@ app.initializers.add('the-turk-flamoji', (app) => {
                   12.1: '12.1',
                 }}
                 buttonClassName="Button"
-                onchange={this.settings['the-turk-flamoji.emoji_version']}
+                onchange={this.settings['pianotell-flamoji.emoji_version']}
               />
             </div>
-            <div className="helpText">{app.translator.trans('the-turk-flamoji.admin.settings.emoji_version_text')}</div>
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.emoji_version_text')}</div>
           </div>
         </div>
 
         <div className="Flamoji--categorySettingsContainer">
-          <h3>{app.translator.trans('the-turk-flamoji.admin.settings.category_settings_heading')}</h3>
+          <h3>{app.translator.trans('pianotell-flamoji.admin.settings.category_settings_heading')}</h3>
           <hr />
           <div className="Flamoji--categorySetting">
             <div className="Form-group">
-              <label>{app.translator.trans('the-turk-flamoji.admin.settings.initial_category_label')}</label>
+              <label>{app.translator.trans('pianotell-flamoji.admin.settings.initial_category_label')}</label>
               <Select
-                value={this.setting(['the-turk-flamoji.initial_category'])() || 'smileys'}
+                value={this.setting(['pianotell-flamoji.initial_category'])() || 'smileys'}
                 options={initialCategoryOptions}
                 buttonClassName="Button"
-                onchange={this.settings['the-turk-flamoji.initial_category']}
+                onchange={this.settings['pianotell-flamoji.initial_category']}
               />
             </div>
-            <div className="helpText">{app.translator.trans('the-turk-flamoji.admin.settings.initial_category_text')}</div>
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.initial_category_text')}</div>
           </div>
           <div className="Flamoji--categorySetting">
             <div className="Form-group">
               <Switch
                 state={
-                  !!this.setting(['the-turk-flamoji.show_category_buttons'])() && this.setting(['the-turk-flamoji.show_category_buttons'])() !== '0'
+                  !!this.setting(['pianotell-flamoji.show_category_buttons'])() && this.setting(['pianotell-flamoji.show_category_buttons'])() !== '0'
                 }
-                onchange={this.settings['the-turk-flamoji.show_category_buttons']}
+                onchange={this.settings['pianotell-flamoji.show_category_buttons']}
               >
-                {app.translator.trans('the-turk-flamoji.admin.settings.show_category_buttons_label')}
+                {app.translator.trans('pianotell-flamoji.admin.settings.show_category_buttons_label')}
               </Switch>
             </div>
             <div className="helpText" />
@@ -212,25 +212,25 @@ app.initializers.add('the-turk-flamoji', (app) => {
           <div className="Flamoji--categorySetting">
             <div className="Form-group">
               <Switch
-                state={!!this.setting(['the-turk-flamoji.show_recents'])() && this.setting(['the-turk-flamoji.show_recents'])() !== '0'}
-                onchange={this.settings['the-turk-flamoji.show_recents']}
+                state={!!this.setting(['pianotell-flamoji.show_recents'])() && this.setting(['pianotell-flamoji.show_recents'])() !== '0'}
+                onchange={this.settings['pianotell-flamoji.show_recents']}
               >
-                {app.translator.trans('the-turk-flamoji.admin.settings.show_recents_label')}
+                {app.translator.trans('pianotell-flamoji.admin.settings.show_recents_label')}
               </Switch>
             </div>
             <div className="helpText" />
           </div>
           <div className="Flamoji--categorySetting recentsCountSetting">
             <div className="Form-group recentsCountGroup">
-              <label>{app.translator.trans('the-turk-flamoji.admin.settings.recents_count_label')}</label>
-              <input className="FormControl" type="number" bidi={this.setting('the-turk-flamoji.recents_count')} />
+              <label>{app.translator.trans('pianotell-flamoji.admin.settings.recents_count_label')}</label>
+              <input className="FormControl" type="number" bidi={this.setting('pianotell-flamoji.recents_count')} />
             </div>
-            <div className="helpText">{app.translator.trans('the-turk-flamoji.admin.settings.recents_count_text')}</div>
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.recents_count_text')}</div>
           </div>
           <div className="Flamoji--categorySetting specifyCategoriesSetting">
             <div className="Form-group specifyCategoriesGroup">
-              <label>{app.translator.trans('the-turk-flamoji.admin.settings.specify_categories_label')}</label>
-              <div className="helpText">{app.translator.trans('the-turk-flamoji.admin.settings.specify_categories_text')}</div>
+              <label>{app.translator.trans('pianotell-flamoji.admin.settings.specify_categories_label')}</label>
+              <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.specify_categories_text')}</div>
               <div className="options">
                 {getEmojiCategories().map((category) => {
                   return (
@@ -251,7 +251,7 @@ app.initializers.add('the-turk-flamoji', (app) => {
                           }
                         }}
                       />
-                      <label for={category}>{app.translator.trans('the-turk-flamoji.admin.settings.emoji_categories.' + category)}</label>
+                      <label for={category}>{app.translator.trans('pianotell-flamoji.admin.settings.emoji_categories.' + category)}</label>
                     </div>
                   );
                 })}

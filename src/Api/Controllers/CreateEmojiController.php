@@ -1,10 +1,11 @@
 <?php
 
-namespace TheTurk\Flamoji\Api\Controllers;
+namespace PianoTell\Flamoji\Api\Controllers;
 
 use Flarum\Api\Controller\AbstractCreateController;
-use TheTurk\Flamoji\Api\Serializers\EmojiSerializer;
-use TheTurk\Flamoji\Commands\CreateEmoji;
+use Flarum\Http\RequestUtil;
+use PianoTell\Flamoji\Api\Serializers\EmojiSerializer;
+use PianoTell\Flamoji\Commands\CreateEmoji;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\Arr;
 use Psr\Http\Message\ServerRequestInterface;
@@ -35,6 +36,8 @@ class CreateEmojiController extends AbstractCreateController
      */
     protected function data(ServerRequestInterface $request, Document $document)
     {
+        RequestUtil::getActor($request)->assertAdmin();
+
         return $this->bus->dispatch(
             new CreateEmoji(Arr::get($request->getParsedBody(), 'data', []))
         );
