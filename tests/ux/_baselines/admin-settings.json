@@ -1,0 +1,66 @@
+{
+  "switches": [
+    {
+      "label": "Auto hide",
+      "checked": true
+    },
+    {
+      "label": "Show preview section",
+      "checked": true
+    },
+    {
+      "label": "Show search input",
+      "checked": true
+    },
+    {
+      "label": "Show skin-tone variants",
+      "checked": true
+    },
+    {
+      "label": "Show category buttons",
+      "checked": true
+    },
+    {
+      "label": "Show (and save) most recently used emojis",
+      "checked": true
+    }
+  ],
+  "pickerSet": "auto",
+  "frequentRows": 4,
+  "categories": [
+    {
+      "name": "people",
+      "checked": true
+    },
+    {
+      "name": "nature",
+      "checked": true
+    },
+    {
+      "name": "foods",
+      "checked": true
+    },
+    {
+      "name": "activity",
+      "checked": true
+    },
+    {
+      "name": "places",
+      "checked": true
+    },
+    {
+      "name": "objects",
+      "checked": true
+    },
+    {
+      "name": "symbols",
+      "checked": true
+    },
+    {
+      "name": "flags",
+      "checked": true
+    }
+  ],
+  "customEmojiSection": true,
+  "customEmojiCount": 0
+}

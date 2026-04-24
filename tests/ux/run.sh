@@ -27,6 +27,8 @@ SPECS=(
   tests/ux/custom-emoji.spec.mjs
   tests/ux/import-export.spec.mjs
   tests/ux/picker-baseline.spec.mjs
+  tests/ux/picker-variants.spec.mjs
+  tests/ux/admin-baseline.spec.mjs
   tests/ux/picker-loading.spec.mjs
 )
 

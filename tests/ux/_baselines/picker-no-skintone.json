@@ -2,7 +2,7 @@
   "visible": true,
   "hasSearchInput": true,
   "hasPreview": true,
-  "hasSkinToneButton": true,
+  "hasSkinToneButton": false,
   "navLabels": [
     "Recently Used",
     "Smileys & People",
@@ -12,19 +12,9 @@
     "Travel & Places",
     "Objects",
     "Symbols",
-    "Flags"
+    "Flags",
+    "Custom"
   ],
-  "categoryHeadings": [
-    "Recently Used",
-    "Smileys & People",
-    "Animals & Nature",
-    "Food & Drink",
-    "Activities",
-    "Travel & Places",
-    "Objects",
-    "Symbols",
-    "Flags"
-  ],
-  "firstTileUsesTwemojiSprite": false,
+  "navCount": 10,
   "firstTileHasSpriteBackground": true
 }
