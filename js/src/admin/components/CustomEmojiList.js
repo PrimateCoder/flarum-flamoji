@@ -31,6 +31,7 @@ export default class CustomEmojiList extends Component {
                   <Button
                     className="Button Button--icon customEmoji-editButton"
                     icon="fas fa-pencil-alt"
+                    aria-label={app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.emoji_list.edit_button', {}, true)}
                     onclick={() => app.modal.show(EditEmojiModal, { model: emoji })}
                   />
                   <div className="customEmoji-imageWrapper">
@@ -46,7 +47,7 @@ export default class CustomEmojiList extends Component {
           <li>
             <div class="customEmoji addEmoji">
               <div className="customEmoji-imageWrapper">
-                <Button className="Button Button--icon customEmoji-addButton" icon="fas fa-plus" onclick={() => app.modal.show(EditEmojiModal)} />
+                <Button className="Button Button--icon customEmoji-addButton" icon="fas fa-plus" aria-label={app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.emoji_list.add_button', {}, true)} onclick={() => app.modal.show(EditEmojiModal)} />
               </div>
             </div>
           </li>

@@ -8,23 +8,23 @@ em-emoji-picker.flamoji-picker-popup {
   position: fixed;
   z-index: @zindex-modal; // float above composer (~1080); fixed positioning is page-scope
   border-radius: @border-radius;
-  .box-shadow(0 2px 6px @shadow-color);
+  box-shadow: 0 2px 6px var(--shadow-color);
 
-  --background-rgb: red(@body-bg), green(@body-bg), blue(@body-bg);
-  --rgb-background: red(@body-bg), green(@body-bg), blue(@body-bg);
-  --rgb-input: red(@control-bg), green(@control-bg), blue(@control-bg);
-  --color-border: @control-bg;
-  --color-border-over: @primary-color;
-  --rgb-color: red(@text-color), green(@text-color), blue(@text-color);
-  --rgb-accent: red(@primary-color), green(@primary-color), blue(@primary-color);
+  // emoji-mart expects --rgb-* as comma-separated R,G,B triplets.
+  // These can't be derived from Flarum's CSS custom properties in LESS
+  // (LESS color functions only work on compile-time values). Instead,
+  // the JS picker code computes them at runtime from getComputedStyle()
+  // and injects them as inline styles so they match the active theme.
+  --color-border: var(--control-bg);
+  --color-border-over: var(--primary-color);
   --font-family: inherit;
   --font-size: 14px;
 
   // Custom prop our shadow-DOM stylesheet (see injectShadowStyles in
   // forum/index.js) reads to color the sticky category headers. Matches
   // the original emoji-button extension, which mapped the picker's
-  // secondary text color to @muted-color.
-  --flamoji-category-header-color: @muted-color;
+  // secondary text color to var(--muted-color).
+  --flamoji-category-header-color: var(--muted-color);
 }
 
 span.flamoji img {
@@ -49,25 +49,25 @@ span.flamoji img {
   justify-content: center;
   gap: 14px;
   padding: 24px;
-  background: @body-bg;
-  color: @text-color;
-  border: 1px solid @control-bg;
+  background: var(--body-bg);
+  color: var(--text-color);
+  border: 1px solid var(--control-bg);
   border-radius: @border-radius;
-  .box-shadow(0 2px 6px @shadow-color);
+  box-shadow: 0 2px 6px var(--shadow-color);
   font-size: 14px;
   text-align: center;
 
   &__spinner {
     width: 36px;
     height: 36px;
-    border: 3px solid fade(@text-color, 15%);
-    border-top-color: @primary-color;
+    border: 3px solid color-mix(in srgb, var(--text-color) 15%, transparent);
+    border-top-color: var(--primary-color);
     border-radius: 50%;
     animation: flamoji-loader-spin 0.85s linear infinite;
   }
 
   &__label {
-    color: @muted-color;
+    color: var(--muted-color);
   }
 
   &__retry {
@@ -76,7 +76,7 @@ span.flamoji img {
 
   &--error {
     .flamoji-picker-loader__label {
-      color: @text-color;
+      color: var(--text-color);
     }
   }
 }
@@ -89,7 +89,7 @@ span.flamoji img {
 @media (prefers-reduced-motion: reduce) {
   .flamoji-picker-loader__spinner {
     animation: flamoji-loader-pulse 1.6s ease-in-out infinite;
-    border-top-color: @primary-color;
+    border-top-color: var(--primary-color);
   }
   @keyframes flamoji-loader-pulse {
     0%, 100% { opacity: 0.45; }

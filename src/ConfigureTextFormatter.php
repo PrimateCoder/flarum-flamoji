@@ -28,6 +28,10 @@ class ConfigureTextFormatter
         $customEmojis = Emoji::all();
 
         foreach ($customEmojis as $emoji) {
+            if (empty($emoji->text_to_replace)) {
+                continue;
+            }
+
             $path = $emoji->path;
 
             // check if the path starts with http:// or https://

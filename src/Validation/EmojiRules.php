@@ -1,6 +1,6 @@
 <?php
 
-namespace PianoTell\Flamoji\Commands;
+namespace PianoTell\Flamoji\Validation;
 
 use Flarum\Foundation\ValidationException;
 

@@ -12,11 +12,11 @@
 
 namespace PianoTell\Flamoji;
 
-use Flarum\Api\Serializer\ForumSerializer;
+use Flarum\Api\Context;
+use Flarum\Api\Resource\ForumResource;
+use Flarum\Api\Schema;
 use Flarum\Extend;
 use Flarum\Extension\ExtensionManager;
-use s9e\TextFormatter\Configurator;
-use PianoTell\Flamoji\Api\Controllers;
 
 return [
     (new Extend\Frontend('forum'))
@@ -32,12 +32,7 @@ return [
     (new Extend\Formatter)
         ->configure(ConfigureTextFormatter::class),
 
-    (new Extend\Routes('api'))
-        ->get('/pianotell/emojis', 'emojis.list', Controllers\ListEmojisController::class)
-        ->post('/pianotell/emojis', 'emojis.create', Controllers\CreateEmojiController::class)
-        ->post('/pianotell/import-emojis', 'emojis.import', Controllers\ImportEmojiController::class)
-        ->patch('/pianotell/emojis/{id}', 'emojis.update', Controllers\UpdateEmojiController::class)
-        ->delete('/pianotell/emojis/{id}', 'emojis.delete', Controllers\DeleteEmojiController::class),
+    new Extend\ApiResource(Api\Resource\EmojiResource::class),
 
     (new Extend\Settings())
         ->default('pianotell-flamoji.auto_hide', true)
@@ -63,8 +58,9 @@ return [
     // so the picker can match its rendering style (Twemoji vs OS native)
     // when the admin's `picker_set` is left on `auto`. Computed at request
     // time, not stored.
-    (new Extend\ApiSerializer(ForumSerializer::class))
-        ->attribute('flamoji.has_emoji_extension', function ($serializer, $model, $attributes) {
-            return resolve(ExtensionManager::class)->isEnabled('flarum-emoji');
-        }),
+    (new Extend\ApiResource(ForumResource::class))
+        ->fields(fn () => [
+            Schema\Boolean::make('flamoji.has_emoji_extension')
+                ->get(fn ($model, Context $context) => resolve(ExtensionManager::class)->isEnabled('flarum-emoji')),
+        ]),
 ];

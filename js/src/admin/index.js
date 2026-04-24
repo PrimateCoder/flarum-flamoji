@@ -11,8 +11,10 @@ import Select from 'flarum/common/components/Select';
 import Stream from 'flarum/common/utils/Stream';
 import Switch from 'flarum/common/components/Switch';
 
+export { default as extend } from './extend';
+
 app.initializers.add('pianotell-flamoji', (app) => {
-  app.store.models.emojis = Emoji;
+  app.store.models['flamojis'] = Emoji;
   app.customEmojiListState = new CustomEmojiListState();
 
   extend(ExtensionPage.prototype, 'oninit', function () {
@@ -51,7 +53,7 @@ app.initializers.add('pianotell-flamoji', (app) => {
     return dirty;
   });
 
-  app.extensionData.for('pianotell-flamoji').registerSetting(function () {
+  app.registry.for('pianotell-flamoji').registerSetting(function () {
     return (
       <div className="Flamoji--settingsContainer">
         <div className="Flamoji--generalUISettingsContainer">
@@ -112,9 +114,9 @@ app.initializers.add('pianotell-flamoji', (app) => {
               <Select
                 value={this.setting(['pianotell-flamoji.picker_set'])() || 'auto'}
                 options={{
-                  auto: app.translator.trans('pianotell-flamoji.admin.settings.picker_set_auto'),
-                  twemoji: app.translator.trans('pianotell-flamoji.admin.settings.picker_set_twemoji'),
-                  native: app.translator.trans('pianotell-flamoji.admin.settings.picker_set_native'),
+                  auto: app.translator.trans('pianotell-flamoji.admin.settings.picker_set_auto', {}, true),
+                  twemoji: app.translator.trans('pianotell-flamoji.admin.settings.picker_set_twemoji', {}, true),
+                  native: app.translator.trans('pianotell-flamoji.admin.settings.picker_set_native', {}, true),
                 }}
                 buttonClassName="Button"
                 onchange={this.settings['pianotell-flamoji.picker_set']}
@@ -195,27 +197,4 @@ app.initializers.add('pianotell-flamoji', (app) => {
       </div>
     );
   });
-});
-
-// Forward-compat: see js/src/forum/index.js for the same pattern. Exposes
-// our admin extension surface so 2.x's Export Registry (and any future
-// extension that wants to extend our admin UI) can reach it.
-import CustomEmojiList_ from './components/CustomEmojiList';
-import CustomEmojiSection_ from './components/CustomEmojiSection';
-import EditEmojiModal_ from './components/EditEmojiModal';
-import CustomEmojiListState_ from './states/CustomEmojiListState';
-import Emoji_ from '../common/models/Emoji';
-
-export default Object.freeze({
-  components: {
-    CustomEmojiList: CustomEmojiList_,
-    CustomEmojiSection: CustomEmojiSection_,
-    EditEmojiModal: EditEmojiModal_,
-  },
-  states: {
-    CustomEmojiListState: CustomEmojiListState_,
-  },
-  models: {
-    Emoji: Emoji_,
-  },
 });

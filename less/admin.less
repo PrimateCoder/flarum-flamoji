@@ -9,10 +9,13 @@
   margin-bottom: 24px;
 
   h3 {
-    color: @muted-color;
+    color: var(--muted-color);
   }
 
+  // Override Flarum 2.x .Form-group flex layout to restore the 1.x
+  // block layout our settings UI was designed against.
   .Form-group {
+    display: block;
     margin-bottom: 12px;
 
     label {
@@ -29,6 +32,7 @@
 .Flamoji--categorySettingsContainer {
   .Form-group:not(.specifyCategoriesGroup) {
     display: flex;
+    flex-direction: row;
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
@@ -47,7 +51,7 @@
     .cat-checkbox {
       & label {
         font-weight: 400;
-        color: @muted-color;
+        color: var(--muted-color);
         padding: 5px;
       }
     }

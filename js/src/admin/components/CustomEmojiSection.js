@@ -15,14 +15,15 @@ export default class CustomEmojiSection extends Component {
   exportEmojiList() {
     var customEmojiList = {};
 
-    app.store.find('pianotell/emojis', { filter: { all: 1 } }).then((results) => {
-      results.payload.data.map((emoji, i) => {
-        const attr = emoji.attributes;
-
+    app.request({ method: 'GET', url: `${app.forum.attribute('apiUrl')}/flamojis/all` }).then((response) => {
+      const emojis = Object.keys(response)
+        .filter((k) => !isNaN(k))
+        .map((k) => response[k]);
+      emojis.map((emoji, i) => {
         customEmojiList[i] = {
-          title: attr.title,
-          text_to_replace: attr.text_to_replace,
-          path: attr.path,
+          title: emoji.title,
+          text_to_replace: emoji.text_to_replace,
+          path: emoji.path,
         };
       });
 
@@ -32,7 +33,7 @@ export default class CustomEmojiSection extends Component {
   }
 
   importEmojiList() {
-    if (!confirm(app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.import_emojis_message'))) return;
+    if (!confirm(app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.import_emojis_message', {}, true))) return;
 
     var input = document.createElement('input');
     input.type = 'file';
@@ -52,7 +53,7 @@ export default class CustomEmojiSection extends Component {
         app
           .request({
             method: 'POST',
-            url: `${app.forum.attribute('apiUrl')}/pianotell/import-emojis`,
+            url: `${app.forum.attribute('apiUrl')}/flamojis/import`,
             body: { data: JSON.parse(readerEvent.target.result) },
           })
           .then(() => {

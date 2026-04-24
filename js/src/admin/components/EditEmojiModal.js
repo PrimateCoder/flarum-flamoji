@@ -1,7 +1,8 @@
+import Form from 'flarum/common/components/Form';
 import app from 'flarum/common/app';
 import Alert from 'flarum/common/components/Alert';
 import Button from 'flarum/common/components/Button';
-import Modal from 'flarum/common/components/Modal';
+import FormModal from 'flarum/common/components/FormModal';
 import ItemList from 'flarum/common/utils/ItemList';
 import Stream from 'flarum/common/utils/Stream';
 import urlChecker from '../../common/utils/urlChecker';
@@ -10,11 +11,11 @@ import urlChecker from '../../common/utils/urlChecker';
  * The `EditEmojiModal` component shows a modal dialog which allows the user
  * to add or edit a emoji.
  */
-export default class EditEmojiModal extends Modal {
+export default class EditEmojiModal extends FormModal {
   oninit(vnode) {
     super.oninit(vnode);
 
-    this.emoji = this.attrs.model || app.store.createRecord('emojis');
+    this.emoji = this.attrs.model || app.store.createRecord('flamojis');
 
     this.emojiTitle = Stream(this.emoji.title() || '');
     this.textToReplace = Stream(this.emoji.textToReplace() || '');
@@ -40,7 +41,7 @@ export default class EditEmojiModal extends Modal {
   content() {
     return (
       <div className="Modal-body">
-        <div className="Form">{this.fields().toArray()}</div>
+        <Form>{this.fields().toArray()}</Form>
       </div>
     );
   }
@@ -103,7 +104,7 @@ export default class EditEmojiModal extends Modal {
   submitData() {
     return {
       title: this.emojiTitle(),
-      textToReplace: this.textToReplace(),
+      text_to_replace: this.textToReplace(),
       path: this.path(),
     };
   }
@@ -136,7 +137,7 @@ export default class EditEmojiModal extends Modal {
   }
 
   delete() {
-    if (!confirm(app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.delete_emoji_confirmation'))) {
+    if (!confirm(app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.delete_emoji_confirmation', {}, true))) {
       return;
     }
 
@@ -160,7 +161,11 @@ export default class EditEmojiModal extends Modal {
   }
 
   showSuccessMessage() {
-    return app.alerts.show(Alert, { type: 'success' }, app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.saved_message'));
+    return app.alerts.show(
+      Alert,
+      { type: 'success' },
+      app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.saved_message')
+    );
   }
 
   showCacheClearWarning(err) {

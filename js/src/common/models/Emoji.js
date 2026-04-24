@@ -7,6 +7,6 @@ export default class Emoji extends mixin(Model, {
   path: Model.attribute('path'),
 }) {
   apiEndpoint() {
-    return '/pianotell/emojis' + (this.exists ? '/' + this.data.id : '');
+    return '/flamojis' + (this.exists ? '/' + this.data.id : '');
   }
 }

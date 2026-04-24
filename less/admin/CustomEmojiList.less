@@ -16,7 +16,7 @@
   }
 
   .LoadingIndicator-container {
-    background: fade(@body-bg, 90%);
+    background: color-mix(in srgb, var(--body-bg) 90%, transparent);
     position: absolute;
     top: 0;
     right: 0;
@@ -26,19 +26,19 @@
   }
 
   .customEmoji {
-    border: 1px solid @control-bg;
+    border: 1px solid var(--control-bg);
     outline: none;
     border-radius: @border-radius;
     overflow: hidden;
-    background: @body-bg;
+    background: var(--body-bg);
     position: relative;
     text-align: center;
     width: 100%;
     height: 100%;
 
     &-title {
-      background: @control-bg;
-      color: @text-color;
+      background: var(--control-bg);
+      color: var(--text-color);
       text-align: center;
       padding: 6px;
       position: absolute;
@@ -53,7 +53,7 @@
         text-overflow: ellipsis;
         margin: 0;
         padding: 0;
-        color: @muted-color;
+        color: var(--muted-color);
       }
     }
 
@@ -83,12 +83,12 @@
       &:hover,
       &:focus {
         opacity: 1;
-        background-color: @control-bg;
+        background-color: var(--control-bg);
       }
     }
 
     &.addEmoji {
-      border: 3px dashed @control-bg;
+      border: 3px dashed var(--control-bg);
 
       &-addButton {
         background-color: transparent;
@@ -99,7 +99,7 @@
         &:hover,
         &:focus {
           opacity: 1;
-          background-color: @control-bg;
+          background-color: var(--control-bg);
         }
       }
     }

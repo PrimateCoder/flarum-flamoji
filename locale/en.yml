@@ -59,12 +59,15 @@ pianotell-flamoji:
         saved_message: => core.admin.settings.saved_message
 
       emoji_list:
+        edit_button: Edit emoji
+        add_button: Add emoji
         load_more_button: => core.forum.post_stream.load_more_button
 
   # Translations in this namespace are used by the forum user interface.
   forum:
     # These translations are used by the composer.
     composer:
+      emoji_picker_label: Emoji picker
       emoji_tooltip: Insert emoji
       picker_loading: Loading emojis…
       picker_load_error: Could not load the emoji picker. Please try again.

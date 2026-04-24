@@ -4,8 +4,9 @@ import app from 'flarum/common/app';
 import Alert from 'flarum/common/components/Alert';
 import getEmojiCategories from '../common/utils/getEmojiCategories';
 import TextEditorButton from './components/TextEditorButton';
-import TextEditor from 'flarum/common/components/TextEditor';
 import urlChecker from '../common/utils/urlChecker';
+
+export { default as extend } from './extend';
 
 // Translation key prefixes
 const t = 'pianotell-flamoji.forum.';
@@ -18,8 +19,7 @@ const t_p = t + 'emoji-mart.';
 // re-pinning this URL to the corresponding emoji-datasource-twitter
 // release — verify by checking that the sprite's tile count matches
 // `data.sheet.cols`/`data.sheet.rows`.
-const TWEMOJI_SPRITESHEET_URL =
-  'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/sheets-256/64.png';
+const TWEMOJI_SPRITESHEET_URL = 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/sheets-256/64.png';
 
 app.initializers.add(
   'pianotell-flamoji',
@@ -33,8 +33,8 @@ app.initializers.add(
      * nested structure.
      */
     function buildI18n() {
-      const cat = (id) => app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.' + id);
-      const tp = (key) => app.translator.trans(t_p + key);
+      const cat = (id) => app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.' + id, {}, true);
+      const tp = (key) => app.translator.trans(t_p + key, {}, true);
       return {
         search: tp('search_placeholder'),
         search_no_results_1: tp('no_emojis_found_title'),
@@ -66,18 +66,16 @@ app.initializers.add(
       };
     }
 
-    extend(TextEditor.prototype, 'oncreate', function () {
+    extend('flarum/common/components/TextEditor', ['oncreate', 'onupdate'], function () {
       this.flamojiButton = this.element.querySelector('.Button-flamoji');
     });
 
-    extend(TextEditor.prototype, 'oninit', function () {
+    extend('flarum/common/components/TextEditor', 'oninit', function () {
       this.isPickerLoading = this.isPickerLoaded = false;
       this.isPickerVisible = false;
 
-      // https://v4.webpack.js.org/guides/public-path/#on-the-fly
-      // Normalize trailing slash on baseUrl so chunk URLs don't end up with
-      // a double slash (`/forum//assets/...`). Most servers tolerate it,
-      // but some chunked-loading paths and CDNs are strict about it.
+      // Point __webpack_public_path__ at our extension's published assets.
+      // This tells webpack where to fetch lazy chunks (emoji-mart.js, etc).
       const baseUrl = (app.forum.attribute('baseUrl') || '').replace(/\/+$/, '');
       __webpack_public_path__ = baseUrl + '/assets/extensions/pianotell-flamoji/dist/';
     });
@@ -114,7 +112,12 @@ app.initializers.add(
      * `this.picker`.
      */
     function positionElement(el) {
-      if (!el || !this.flamojiButton) return;
+      if (!el) return;
+      // Lazily find the button if it hasn't been cached yet
+      if (!this.flamojiButton && this.element) {
+        this.flamojiButton = this.element.querySelector('.Button-flamoji');
+      }
+      if (!this.flamojiButton) return;
       const btnRect = this.flamojiButton.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
       // Reposition won't work until the element has measurable dimensions —
@@ -164,7 +167,7 @@ app.initializers.add(
     // composer closes, or another composer takes over). Without this, every
     // open/close cycle would leak an <em-emoji-picker> custom element on
     // document.body and a window listener.
-    extend(TextEditor.prototype, 'onremove', function () {
+    extend('flarum/common/components/TextEditor', 'onremove', function () {
       if (this._flamojiReposition) {
         window.removeEventListener('resize', this._flamojiReposition);
         window.removeEventListener('scroll', this._flamojiReposition, true);
@@ -235,7 +238,7 @@ app.initializers.add(
 
       const label = document.createElement('div');
       label.className = 'flamoji-picker-loader__label';
-      label.textContent = app.translator.trans(t + 'composer.picker_loading');
+      label.textContent = app.translator.trans(t + 'composer.picker_loading', {}, true);
 
       loader.appendChild(spinner);
       loader.appendChild(label);
@@ -255,7 +258,11 @@ app.initializers.add(
         this._flamojiLoaderReposition = null;
       }
       if (this._flamojiLoader) {
-        try { this._flamojiLoader.remove(); } catch (e) { /* already detached */ }
+        try {
+          this._flamojiLoader.remove();
+        } catch (e) {
+          /* already detached */
+        }
         this._flamojiLoader = null;
       }
     }
@@ -280,12 +287,12 @@ app.initializers.add(
 
       const label = document.createElement('div');
       label.className = 'flamoji-picker-loader__label';
-      label.textContent = app.translator.trans(t + 'composer.picker_load_error');
+      label.textContent = app.translator.trans(t + 'composer.picker_load_error', {}, true);
 
       const retry = document.createElement('button');
       retry.type = 'button';
       retry.className = 'Button Button--primary flamoji-picker-loader__retry';
-      retry.textContent = app.translator.trans(t + 'composer.picker_load_retry');
+      retry.textContent = app.translator.trans(t + 'composer.picker_load_retry', {}, true);
       retry.addEventListener('click', () => {
         unmountPickerLoader.call(this);
         retryCb();
@@ -294,6 +301,40 @@ app.initializers.add(
       loader.appendChild(label);
       loader.appendChild(retry);
       positionElement.call(this, loader);
+    }
+
+    /**
+     * Compute emoji-mart --rgb-* triplets from Flarum's live CSS custom
+     * properties and inject them as inline styles on the picker element.
+     * This adapts to the active color scheme (light, dark, high-contrast)
+     * without hardcoding any color values.
+     */
+    function injectEmojiMartRgbVars(picker) {
+      const style = getComputedStyle(document.documentElement);
+      const toRgb = (cssVar) => {
+        const raw = style.getPropertyValue(cssVar).trim();
+        if (!raw) return null;
+        // Parse the computed color value by drawing it through a temp element
+        const el = document.createElement('div');
+        el.style.color = raw;
+        document.body.appendChild(el);
+        const computed = getComputedStyle(el).color;
+        document.body.removeChild(el);
+        // computed is "rgb(r, g, b)" or "rgba(r, g, b, a)"
+        const m = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        return m ? `${m[1]}, ${m[2]}, ${m[3]}` : null;
+      };
+
+      const bg = toRgb('--body-bg') || '255, 255, 255';
+      const input = toRgb('--control-bg') || '240, 240, 240';
+      const color = toRgb('--text-color') || '17, 17, 17';
+      const accent = toRgb('--primary-color') || '69, 156, 211';
+
+      picker.style.setProperty('--background-rgb', bg);
+      picker.style.setProperty('--rgb-background', bg);
+      picker.style.setProperty('--rgb-input', input);
+      picker.style.setProperty('--rgb-color', color);
+      picker.style.setProperty('--rgb-accent', accent);
     }
 
     /**
@@ -382,10 +423,10 @@ app.initializers.add(
       const customEmojis = [];
       const customEntries = [];
 
-      response['data'].forEach((customEmoji) => {
-        const path = customEmoji['attributes']['path'];
-        const title = customEmoji['attributes']['title'];
-        const replacer = customEmoji['attributes']['text_to_replace'];
+      response.forEach((customEmoji) => {
+        const path = customEmoji['path'];
+        const title = customEmoji['title'];
+        const replacer = customEmoji['text_to_replace'];
         // Use the path as a stable id; paths are unique in the custom-emoji table.
         const id = 'flamoji-' + path;
 
@@ -399,7 +440,11 @@ app.initializers.add(
         [title, stripped].forEach((src) => {
           if (!src) return;
           keywords.add(src.toLowerCase());
-          src.toLowerCase().split(/[\s\-_]+/).filter(Boolean).forEach((tok) => keywords.add(tok));
+          src
+            .toLowerCase()
+            .split(/[\s\-_]+/)
+            .filter(Boolean)
+            .forEach((tok) => keywords.add(tok));
         });
 
         customEmojiReplacers[id] = replacer;
@@ -414,7 +459,7 @@ app.initializers.add(
       if (customEntries.length) {
         customEmojis.push({
           id: 'flamoji_custom',
-          name: app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.custom'),
+          name: app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.custom', {}, true),
           emojis: customEntries,
         });
 
@@ -476,7 +521,7 @@ app.initializers.add(
         searchPosition: showSearch ? 'sticky' : 'none',
         skinTonePosition: showVariants ? 'preview' : 'none',
         navPosition: showCategoryButtons ? 'top' : 'none',
-        maxFrequentRows: showRecents ? (parseInt(app.forum.attribute('flamoji.frequent_rows'), 10) || 4) : 0,
+        maxFrequentRows: showRecents ? parseInt(app.forum.attribute('flamoji.frequent_rows'), 10) || 4 : 0,
         onEmojiSelect: (emoji) => {
           // Built-in emoji: insert the native Unicode character. Custom emoji
           // (those we registered above) carry our own id; insert the
@@ -512,11 +557,14 @@ app.initializers.add(
       // changes (e.g. category navigation expanding rows).
       this.picker = picker;
       picker.classList.add('flamoji-picker-popup');
+      picker.setAttribute('role', 'dialog');
+      picker.setAttribute('aria-label', app.translator.trans(t + 'composer.emoji_picker_label', {}, true));
       // Tear down the loading placeholder right before the real picker is
       // attached so positioning math (which is shared) sees the correct
       // mount target.
       unmountPickerLoader.call(this);
       document.body.appendChild(picker);
+      injectEmojiMartRgbVars(picker);
       injectShadowStyles(picker);
 
       this._flamojiReposition = positionPicker.bind(this);
@@ -565,65 +613,84 @@ app.initializers.add(
       m.redraw();
       scheduleLoaderMount.call(this);
 
-      const loadAndBuild = () => Promise.all([
-        import(/* webpackChunkName: "emoji-mart" */ 'emoji-mart'),
-        import(/* webpackChunkName: "emoji-mart-data" */ '@emoji-mart/data/sets/15/twitter.json'),
-        app.request({
-          method: 'GET',
-          url: app.forum.attribute('apiUrl') + '/pianotell/emojis',
-          params: { filter: { all: 1 } },
-        }),
-      ])
-        .then(([emojiMartModule, dataModule, response]) => {
-          // Guard against the editor being torn down (composer closed,
-          // navigated away) while chunks were downloading. Without this
-          // we'd append a picker to document.body that nothing references
-          // and leak listeners on a detached editor element.
-          if (!this.element || !this.element.isConnected) {
+      // Re-assert __webpack_public_path__ and append a cache-busting
+      // query string derived from the Flarum forum.js revision hash.
+      // This ensures chunk URLs bust the browser cache after upgrades.
+      const baseUrl = (app.forum.attribute('baseUrl') || '').replace(/\/+$/, '');
+      __webpack_public_path__ = baseUrl + '/assets/extensions/pianotell-flamoji/dist/';
+
+      if (!onPickerButtonClick._versioned) {
+        const scripts = document.querySelectorAll('script[src*="forum.js"]');
+        for (const s of scripts) {
+          const m = s.src.match(/[?&]v=([a-f0-9]+)/);
+          if (m) {
+            const ver = m[1];
+            const origU = __webpack_require__.u;
+            __webpack_require__.u = (id) => origU(id) + '?v=' + ver;
+            break;
+          }
+        }
+        onPickerButtonClick._versioned = true;
+      }
+
+      const loadAndBuild = () =>
+        Promise.all([
+          import(/* webpackChunkName: "emoji-mart" */ 'emoji-mart'),
+          import(/* webpackChunkName: "emoji-mart-data" */ '@emoji-mart/data/sets/15/twitter.json'),
+          app.request({
+            method: 'GET',
+            url: app.forum.attribute('apiUrl') + '/flamojis/all',
+          }),
+        ])
+          .then(([emojiMartModule, dataModule, response]) => {
+            // Guard against the editor being torn down (composer closed,
+            // navigated away) while chunks were downloading. Without this
+            // we'd append a picker to document.body that nothing references
+            // and leak listeners on a detached editor element.
+            if (!this.element || !this.element.isConnected) {
+              this.isPickerLoading = false;
+              unmountPickerLoader.call(this);
+              return;
+            }
+            // The /all endpoint returns raw model objects keyed numerically
+            // (not a JSON:API envelope). Extract them into an array.
+            const emojis = Object.keys(response)
+              .filter((k) => !isNaN(k))
+              .map((k) => response[k]);
+            buildPicker.call(this, emojiMartModule, dataModule, emojis);
+          })
+          .catch((err) => {
+            console.error('[pianotell-flamoji] failed to load picker:', err);
             this.isPickerLoading = false;
-            unmountPickerLoader.call(this);
-            return;
-          }
-          // Defensive: a corrupt or proxied API response could leave us
-          // without the expected JSON:API shape. Coerce to an empty list
-          // rather than crashing inside the forEach loop.
-          const safeResponse = response && Array.isArray(response.data)
-            ? response
-            : { data: [] };
-          buildPicker.call(this, emojiMartModule, dataModule, safeResponse);
-        })
-        .catch((err) => {
-          console.error('[pianotell-flamoji] failed to load picker:', err);
-          this.isPickerLoading = false;
-          // Inline error card with Retry button on the loader surface,
-          // plus a top-of-page Alert (some users keep focus inside the
-          // composer and miss page-level alerts).
-          showLoaderError.call(this, () => {
-            this.isPickerLoading = true;
+            // Inline error card with Retry button on the loader surface,
+            // plus a top-of-page Alert (some users keep focus inside the
+            // composer and miss page-level alerts).
+            showLoaderError.call(this, () => {
+              this.isPickerLoading = true;
+              m.redraw();
+              scheduleLoaderMount.call(this);
+              loadAndBuild();
+            });
+            if (app.alerts) {
+              app.alerts.show(
+                Alert,
+                { type: 'error', dismissible: true },
+                app.translator.trans('pianotell-flamoji.forum.composer.picker_load_error')
+              );
+            }
             m.redraw();
-            scheduleLoaderMount.call(this);
-            loadAndBuild();
           });
-          if (app.alerts) {
-            app.alerts.show(
-              Alert,
-              { type: 'error', dismissible: true },
-              app.translator.trans('pianotell-flamoji.forum.composer.picker_load_error')
-            );
-          }
-          m.redraw();
-        });
 
       loadAndBuild();
     }
 
-    extend(TextEditor.prototype, 'toolbarItems', function (items) {
+    extend('flarum/common/components/TextEditor', 'toolbarItems', function (items) {
       items.add(
         'flamoji',
         TextEditorButton.component({
           onclick: onPickerButtonClick.bind(this),
           icon: this.isPickerLoading ? 'fas fa-spinner fa-pulse' : 'far fa-smile-wink',
-          title: app.translator.trans(t + 'composer.emoji_tooltip'),
+          title: app.translator.trans(t + 'composer.emoji_tooltip', {}, true),
         })
       );
 
@@ -633,21 +700,3 @@ app.initializers.add(
   },
   -150 // initialize before flarum/emoji
 );
-
-// Forward-compat: Flarum 2.x's Export Registry discovers extension internals
-// through a namespaced default export on the entry module. Other extensions
-// can then `import { components } from 'ext:pianotell/flamoji/forum'`.
-// Harmless under 1.x — just a re-exported object.
-import TextEditorButton_ from './components/TextEditorButton';
-import urlChecker_ from '../common/utils/urlChecker';
-import getEmojiCategories_ from '../common/utils/getEmojiCategories';
-
-export default Object.freeze({
-  components: {
-    TextEditorButton: TextEditorButton_,
-  },
-  utils: {
-    urlChecker: urlChecker_,
-    getEmojiCategories: getEmojiCategories_,
-  },
-});
