@@ -95,12 +95,12 @@ async function snapshotLoader(page) {
     // emoji-mart chunks themselves are cached after first run so we can't
     // count on them being slow; delaying the API gives a deterministic
     // window in which the loader must be visible.
-    await page.route('**/api/pianotell/emojis*', async (route) => {
+    await page.route('**/api/flamojis/**', async (route) => {
       await new Promise((r) => setTimeout(r, 1500));
       await route.continue();
     });
 
-    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await page.goto(BASE, { waitUntil: 'networkidle' });
     await openComposer(page);
     await clickPickerButton(page);
 
@@ -161,7 +161,7 @@ async function snapshotLoader(page) {
     );
 
     // Drop the throttle for the next phase.
-    await page.unroute('**/api/pianotell/emojis*');
+    await page.unroute('**/api/flamojis/**');
 
     // ---------------------------------------------------------------
     // Phase 2: Loader swaps to error state when API fails. Retry works.
@@ -171,7 +171,7 @@ async function snapshotLoader(page) {
     const page2 = await context.newPage();
 
     let blockApi = true;
-    await page2.route('**/api/pianotell/emojis*', async (route) => {
+    await page2.route('**/api/flamojis/**', async (route) => {
       if (blockApi) {
         await route.fulfill({ status: 500, body: 'forced failure' });
       } else {
@@ -218,7 +218,7 @@ async function snapshotLoader(page) {
     const afterRetry = await snapshotLoader(page2);
     check('loader is removed after successful Retry', !afterRetry.present);
 
-    await page2.unroute('**/api/pianotell/emojis*');
+    await page2.unroute('**/api/flamojis/**');
     await page2.close();
 
     // ---------------------------------------------------------------
@@ -227,7 +227,7 @@ async function snapshotLoader(page) {
     // isPickerLoading is true, but verify the user-visible invariant).
     // ---------------------------------------------------------------
     const page3 = await context.newPage();
-    await page3.route('**/api/pianotell/emojis*', async (route) => {
+    await page3.route('**/api/flamojis/**', async (route) => {
       await new Promise((r) => setTimeout(r, 1500));
       await route.continue();
     });
@@ -253,7 +253,7 @@ async function snapshotLoader(page) {
     await page3.waitForSelector('em-emoji-picker.flamoji-picker-popup', {
       timeout: 15_000,
     });
-    await page3.unroute('**/api/pianotell/emojis*');
+    await page3.unroute('**/api/flamojis/**');
     await page3.close();
 
     // ---------------------------------------------------------------
@@ -262,7 +262,7 @@ async function snapshotLoader(page) {
     // the toolbar button if the page scrolls under it during the load.
     // ---------------------------------------------------------------
     const page4 = await context.newPage();
-    await page4.route('**/api/pianotell/emojis*', async (route) => {
+    await page4.route('**/api/flamojis/**', async (route) => {
       await new Promise((r) => setTimeout(r, 2500));
       await route.continue();
     });
@@ -293,7 +293,7 @@ async function snapshotLoader(page) {
       afterResize !== beforeScroll,
       `before=${beforeScroll} after=${afterResize}`
     );
-    await page4.unroute('**/api/pianotell/emojis*');
+    await page4.unroute('**/api/flamojis/**');
     await page4.close();
 
     // ---------------------------------------------------------------
@@ -302,7 +302,7 @@ async function snapshotLoader(page) {
     // already-mounted loader; otherwise we'd leak DOM into document.body.
     // ---------------------------------------------------------------
     const page5 = await context.newPage();
-    await page5.route('**/api/pianotell/emojis*', async (route) => {
+    await page5.route('**/api/flamojis/**', async (route) => {
       await new Promise((r) => setTimeout(r, 3000));
       await route.continue();
     });
@@ -327,7 +327,7 @@ async function snapshotLoader(page) {
       orphan === 0,
       `found ${orphan} orphaned loader element(s) after composer close`
     );
-    await page5.unroute('**/api/pianotell/emojis*');
+    await page5.unroute('**/api/flamojis/**');
     await page5.close();
 
     // ---------------------------------------------------------------

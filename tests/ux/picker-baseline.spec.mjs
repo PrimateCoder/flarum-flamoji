@@ -36,7 +36,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
-import { applySettings, DEFAULTS } from './_admin.mjs';
+import { applySettings, DEFAULTS, deleteAllCustomEmojis } from './_admin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINES = resolve(HERE, '_baselines');
@@ -143,6 +143,10 @@ try {
   });
   await ctx.addCookies([{ name: 'flarum_remember', value: COOKIE, url: BASE }]);
   const page = await ctx.newPage();
+
+  // Ensure clean state: no custom emojis, default settings.
+  console.log('\n[setup] cleaning custom emojis');
+  await deleteAllCustomEmojis(page, BASE);
 
   // Force the deterministic preset. Twemoji sprites render the same
   // bytes across hosts; "native" varies per OS.

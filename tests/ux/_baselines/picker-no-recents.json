@@ -11,9 +11,8 @@
     "Travel & Places",
     "Objects",
     "Symbols",
-    "Flags",
-    "Custom"
+    "Flags"
   ],
-  "navCount": 9,
+  "navCount": 8,
   "firstTileHasSpriteBackground": true
 }

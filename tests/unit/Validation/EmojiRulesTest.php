@@ -1,14 +1,14 @@
 <?php
 
-namespace PianoTell\Flamoji\Tests\unit\Commands;
+namespace PianoTell\Flamoji\Tests\unit\Validation;
 
 use Flarum\Foundation\ValidationException;
 use Flarum\Testing\unit\TestCase;
-use PianoTell\Flamoji\Commands\EmojiRules;
+use PianoTell\Flamoji\Validation\EmojiRules;
 
 class EmojiRulesTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_create_returns_trimmed_attributes_on_success(): void
     {
         $result = EmojiRules::validateCreate([
@@ -24,7 +24,7 @@ class EmojiRulesTest extends TestCase
         ], $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_create_accepts_camelcase_text_to_replace_alias(): void
     {
         // Edit handler uses `textToReplace` while list/create handlers use
@@ -38,7 +38,7 @@ class EmojiRulesTest extends TestCase
         $this->assertSame(':a:', $result['text_to_replace']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_create_treats_title_as_optional(): void
     {
         $result = EmojiRules::validateCreate([
@@ -49,7 +49,7 @@ class EmojiRulesTest extends TestCase
         $this->assertSame('', $result['title']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_create_rejects_missing_required_fields(): void
     {
         try {
@@ -62,7 +62,7 @@ class EmojiRulesTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_create_rejects_whitespace_in_text_to_replace(): void
     {
         try {
@@ -76,7 +76,7 @@ class EmojiRulesTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_create_rejects_unicode_whitespace_in_text_to_replace(): void
     {
         // \s in PCRE with the /u flag must catch non-breaking space etc.
@@ -91,7 +91,7 @@ class EmojiRulesTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_create_applies_error_key_prefix_for_bulk_import(): void
     {
         try {
@@ -104,38 +104,38 @@ class EmojiRulesTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_text_to_replace_returns_null_for_optional_empty(): void
     {
         $this->assertNull(EmojiRules::validateTextToReplace('', false));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_text_to_replace_returns_error_for_required_empty(): void
     {
         $this->assertNotNull(EmojiRules::validateTextToReplace('', true));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_text_to_replace_accepts_valid_input(): void
     {
         $this->assertNull(EmojiRules::validateTextToReplace(':wave:', true));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_path_returns_null_for_optional_empty(): void
     {
         // Empty + not-required is "no change" semantics for the edit path.
         $this->assertNull(EmojiRules::validatePath('', false));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_path_returns_error_for_required_empty(): void
     {
         $this->assertNotNull(EmojiRules::validatePath('', true));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validate_path_accepts_any_non_empty_value(): void
     {
         // Path is intentionally unconstrained: it covers absolute URLs, app

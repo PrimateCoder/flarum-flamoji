@@ -29,41 +29,43 @@ class EmojisApiTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function list_endpoint_is_publicly_accessible(): void
     {
-        $response = $this->send($this->request('GET', '/api/pianotell/emojis'));
+        $response = $this->send($this->request('GET', '/api/flamojis'));
 
         $this->assertEquals(200, $response->getStatusCode());
         $body = json_decode($response->getBody()->getContents(), true);
         $this->assertCount(3, $body['data']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function list_endpoint_orders_by_id_descending(): void
     {
-        $response = $this->send($this->request('GET', '/api/pianotell/emojis'));
+        $response = $this->send($this->request('GET', '/api/flamojis'));
         $body = json_decode($response->getBody()->getContents(), true);
 
         $ids = array_map(fn ($r) => (int) $r['id'], $body['data']);
         $this->assertSame([3, 2, 1], $ids);
     }
 
-    /** @test */
-    public function list_endpoint_filter_all_returns_full_set_unpaginated(): void
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function list_endpoint_all_returns_full_set_unpaginated(): void
     {
-        // Used by the forum picker to feed every custom emoji into the
-        // "Custom" category in one round-trip.
-        $response = $this->send($this->request('GET', '/api/pianotell/emojis?filter[all]=1'));
+        $response = $this->send($this->request('GET', '/api/flamojis/all'));
+        $this->assertEquals(200, $response->getStatusCode());
         $body = json_decode($response->getBody()->getContents(), true);
 
-        $this->assertCount(3, $body['data']);
+        // Custom endpoint returns serialized models (not JSON:API envelope)
+        // Keys are numeric indices, plus 'jsonapi' metadata.
+        $emojis = array_filter($body, fn ($key) => is_numeric($key), ARRAY_FILTER_USE_KEY);
+        $this->assertCount(3, $emojis);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function create_endpoint_rejects_anonymous_request(): void
     {
-        $response = $this->send($this->request('POST', '/api/pianotell/emojis', [
+        $response = $this->send($this->request('POST', '/api/flamojis', [
             'json' => ['data' => ['attributes' => ['title' => 'X', 'text_to_replace' => ':x:', 'path' => '/x.png']]],
         ]));
 
@@ -74,10 +76,10 @@ class EmojisApiTest extends TestCase
         $this->assertNull(Emoji::where('text_to_replace', ':x:')->first());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function create_endpoint_rejects_normal_user(): void
     {
-        $response = $this->send($this->request('POST', '/api/pianotell/emojis', [
+        $response = $this->send($this->request('POST', '/api/flamojis', [
             'authenticatedAs' => 2,
             'json' => ['data' => ['attributes' => ['title' => 'X', 'text_to_replace' => ':x:', 'path' => '/x.png']]],
         ]));
@@ -85,10 +87,10 @@ class EmojisApiTest extends TestCase
         $this->assertEquals(403, $response->getStatusCode());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function create_endpoint_persists_new_emoji_for_admin(): void
     {
-        $response = $this->send($this->request('POST', '/api/pianotell/emojis', [
+        $response = $this->send($this->request('POST', '/api/flamojis', [
             'authenticatedAs' => 1,
             'json' => ['data' => ['attributes' => [
                 'title' => 'Party',
@@ -105,10 +107,10 @@ class EmojisApiTest extends TestCase
         $this->assertSame('/party.png', $emoji->path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function create_endpoint_returns_422_on_validation_failure(): void
     {
-        $response = $this->send($this->request('POST', '/api/pianotell/emojis', [
+        $response = $this->send($this->request('POST', '/api/flamojis', [
             'authenticatedAs' => 1,
             'json' => ['data' => ['attributes' => [
                 'title' => 'No trigger',
@@ -120,14 +122,14 @@ class EmojisApiTest extends TestCase
         $this->assertEquals(422, $response->getStatusCode());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function update_endpoint_modifies_emoji_for_admin(): void
     {
-        $response = $this->send($this->request('PATCH', '/api/pianotell/emojis/1', [
+        $response = $this->send($this->request('PATCH', '/api/flamojis/1', [
             'authenticatedAs' => 1,
             'json' => ['data' => ['attributes' => [
                 'title' => 'Renamed Wave',
-                'textToReplace' => ':hi:',
+                'text_to_replace' => ':hi:',
             ]]],
         ]));
 
@@ -139,22 +141,22 @@ class EmojisApiTest extends TestCase
         $this->assertSame('/wave.png', $emoji->path); // unchanged
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function update_endpoint_returns_422_when_changing_trigger_to_whitespace_value(): void
     {
-        $response = $this->send($this->request('PATCH', '/api/pianotell/emojis/1', [
+        $response = $this->send($this->request('PATCH', '/api/flamojis/1', [
             'authenticatedAs' => 1,
-            'json' => ['data' => ['attributes' => ['textToReplace' => ':bad trigger:']]],
+            'json' => ['data' => ['attributes' => ['text_to_replace' => ':bad trigger:']]],
         ]));
 
         $this->assertEquals(422, $response->getStatusCode());
         $this->assertSame(':wave:', Emoji::find(1)->text_to_replace);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function update_endpoint_rejects_normal_user(): void
     {
-        $response = $this->send($this->request('PATCH', '/api/pianotell/emojis/1', [
+        $response = $this->send($this->request('PATCH', '/api/flamojis/1', [
             'authenticatedAs' => 2,
             'json' => ['data' => ['attributes' => ['title' => 'Hax']]],
         ]));
@@ -162,10 +164,10 @@ class EmojisApiTest extends TestCase
         $this->assertEquals(403, $response->getStatusCode());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function delete_endpoint_removes_emoji_for_admin(): void
     {
-        $response = $this->send($this->request('DELETE', '/api/pianotell/emojis/1', [
+        $response = $this->send($this->request('DELETE', '/api/flamojis/1', [
             'authenticatedAs' => 1,
         ]));
 
@@ -173,10 +175,10 @@ class EmojisApiTest extends TestCase
         $this->assertNull(Emoji::find(1));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function delete_endpoint_rejects_normal_user(): void
     {
-        $response = $this->send($this->request('DELETE', '/api/pianotell/emojis/1', [
+        $response = $this->send($this->request('DELETE', '/api/flamojis/1', [
             'authenticatedAs' => 2,
         ]));
 
@@ -184,10 +186,10 @@ class EmojisApiTest extends TestCase
         $this->assertNotNull(Emoji::find(1));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function import_endpoint_persists_all_rows_for_admin(): void
     {
-        $response = $this->send($this->request('POST', '/api/pianotell/import-emojis', [
+        $response = $this->send($this->request('POST', '/api/flamojis/import', [
             'authenticatedAs' => 1,
             'json' => ['data' => [
                 ['title' => 'A', 'text_to_replace' => ':a:', 'path' => '/a.png'],
@@ -200,16 +202,16 @@ class EmojisApiTest extends TestCase
         $this->assertNotNull(Emoji::where('text_to_replace', ':b:')->first());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function import_endpoint_aborts_when_any_row_invalid_and_persists_nothing(): void
     {
         // Boot the app first via send() so Eloquent has a connection
         // resolver wired up. Reading the count before the import lets us
         // assert all-or-nothing semantics regardless of seeded row count.
-        $this->send($this->request('GET', '/api/pianotell/emojis'));
+        $this->send($this->request('GET', '/api/flamojis'));
         $countBefore = Emoji::count();
 
-        $response = $this->send($this->request('POST', '/api/pianotell/import-emojis', [
+        $response = $this->send($this->request('POST', '/api/flamojis/import', [
             'authenticatedAs' => 1,
             'json' => ['data' => [
                 ['title' => 'Good', 'text_to_replace' => ':good:', 'path' => '/g.png'],
@@ -224,10 +226,10 @@ class EmojisApiTest extends TestCase
         $this->assertNull(Emoji::where('text_to_replace', ':good:')->first());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function import_endpoint_rejects_normal_user(): void
     {
-        $response = $this->send($this->request('POST', '/api/pianotell/import-emojis', [
+        $response = $this->send($this->request('POST', '/api/flamojis/import', [
             'authenticatedAs' => 2,
             'json' => ['data' => [['title' => 'X', 'text_to_replace' => ':x:', 'path' => '/x.png']]],
         ]));
@@ -235,7 +237,7 @@ class EmojisApiTest extends TestCase
         $this->assertEquals(403, $response->getStatusCode());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function forum_payload_exposes_has_emoji_extension_attribute(): void
     {
         $response = $this->send($this->request('GET', '/api'));
@@ -248,7 +250,7 @@ class EmojisApiTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function forum_payload_exposes_settings_with_correct_types(): void
     {
         $response = $this->send($this->request('GET', '/api'));

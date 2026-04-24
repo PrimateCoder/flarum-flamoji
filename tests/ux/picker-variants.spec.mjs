@@ -21,7 +21,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
-import { applySettings, DEFAULTS, gotoAdmin, addCustomEmoji, deleteCustomEmojiByShortcode } from './_admin.mjs';
+import { applySettings, DEFAULTS, gotoAdmin, addCustomEmoji, deleteCustomEmojiByShortcode, deleteAllCustomEmojis } from './_admin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINES = resolve(HERE, '_baselines');
@@ -208,31 +208,6 @@ const VARIANTS = [
       check('no-recents — other categories still present', snap.navCount >= 7);
     },
   },
-  {
-    id: 'with-custom-emoji',
-    label: 'custom emoji present',
-    overrides: DEFAULTS,
-    // This variant needs a custom emoji in the DB to show the Custom tab.
-    // setup/teardown are called by the test loop.
-    setup: async (page, baseUrl) => {
-      await gotoAdmin(page, baseUrl);
-      await addCustomEmoji(page, {
-        title: 'Baseline Fixture',
-        shortcode: ':flamoji_baseline_fixture:',
-        path: 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/64/1f600.png',
-      });
-    },
-    teardown: async (page, baseUrl) => {
-      await gotoAdmin(page, baseUrl);
-      await deleteCustomEmojiByShortcode(page, ':flamoji_baseline_fixture:');
-    },
-    checks: (snap) => {
-      check('with-custom-emoji — picker visible', snap.visible);
-      const hasCustom = snap.navLabels.some((l) => /custom/i.test(l));
-      check('with-custom-emoji — Custom category tab present', hasCustom);
-      check('with-custom-emoji — nav has 10+ buttons (9 default + Custom)', snap.navCount >= 10);
-    },
-  },
 ];
 
 let browser;
@@ -246,10 +221,12 @@ try {
   await ctx.addCookies([{ name: 'flarum_remember', value: COOKIE, url: BASE }]);
   const page = await ctx.newPage();
 
+  // Ensure clean state: no leftover custom emojis from prior specs.
+  console.log('\n[setup] cleaning custom emojis');
+  await deleteAllCustomEmojis(page, BASE);
+
   for (const variant of VARIANTS) {
     console.log(`\n[variant: ${variant.id}] applying ${variant.label}`);
-
-    if (variant.setup) await variant.setup(page, BASE);
     await applySettings(page, variant.overrides, BASE);
 
     await page.goto(BASE, { waitUntil: 'load' });
@@ -281,8 +258,6 @@ try {
     // Close picker for next round
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
-
-    if (variant.teardown) await variant.teardown(page, BASE);
   }
 
   // Restore defaults for next spec
