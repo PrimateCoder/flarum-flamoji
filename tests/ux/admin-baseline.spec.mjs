@@ -12,7 +12,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
-import { applySettings, DEFAULTS, gotoAdmin } from './_admin.mjs';
+import { applySettings, DEFAULTS, gotoAdmin, deleteAllCustomEmojis } from './_admin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINES = resolve(HERE, '_baselines');
@@ -82,7 +82,10 @@ try {
   await ctx.addCookies([{ name: 'flarum_remember', value: COOKIE, url: BASE }]);
   const page = await ctx.newPage();
 
-  // Ensure defaults
+  // Ensure clean state: no custom emojis, default settings.
+  console.log('\n[setup] cleaning custom emojis');
+  await deleteAllCustomEmojis(page, BASE);
+
   console.log('\n[setup] restoring defaults');
   await applySettings(page, DEFAULTS, BASE);
   await gotoAdmin(page, BASE);
@@ -158,6 +161,10 @@ try {
 
   // ---- Pixel baseline of settings panel ----
   console.log('\n[pixel] capturing admin settings panel');
+  // Scroll the page to top so the settings container is fully visible
+  // below the fixed admin header.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(500);
   const settingsBox = await page.evaluate(() => {
     const el = document.querySelector('.Flamoji--settingsContainer');
     if (!el) return null;

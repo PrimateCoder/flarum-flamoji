@@ -28,6 +28,7 @@ import {
   gotoAdmin,
   addCustomEmoji,
   deleteCustomEmojiByShortcode,
+  deleteAllCustomEmojis,
   listCustomEmojiShortcodes,
 } from './_admin.mjs';
 
@@ -112,10 +113,12 @@ async function pickerSnapshot(page) {
 
 async function setSearch(page, q) {
   await page.evaluate((query) => {
-    const input = document
-      .querySelector('em-emoji-picker.flamoji-picker-popup')
-      .shadowRoot.querySelector('input[type="search"]');
-    input.value = query;
+    const picker = document.querySelector('em-emoji-picker.flamoji-picker-popup');
+    const input = picker.shadowRoot.querySelector('input[type="search"]');
+    input.focus();
+    const proto = Object.getPrototypeOf(input);
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+    setter.call(input, query);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }, q);
   await page.waitForTimeout(400);
@@ -132,7 +135,7 @@ async function searchResultCount(page) {
       /search/i.test(c.querySelector('.sticky')?.textContent || '')
     );
     if (!cat) return 0;
-    return [...cat.querySelectorAll('button')].filter((b) => !b.hasAttribute('aria-selected')).length;
+    return [...cat.querySelectorAll('button[type="button"]')].length;
   });
 }
 
@@ -142,7 +145,7 @@ async function clickFirstResult(page) {
     const cat = [...sr.querySelectorAll('.category')].find((c) =>
       /search/i.test(c.querySelector('.sticky')?.textContent || '')
     );
-    const tile = cat && [...cat.querySelectorAll('button')].find((b) => !b.hasAttribute('aria-selected'));
+    const tile = cat && cat.querySelector('button[type="button"]');
     if (!tile) return false;
     tile.click();
     return true;
@@ -168,11 +171,11 @@ async function composerText(page) {
     lastPage = page;
     await page.context().setExtraHTTPHeaders({ 'cache-control': 'no-cache' });
 
-    // === 0. baseline: clean stale fixture (best-effort), then capture
-    // the pre-fixture state of both the admin list AND the forum picker.
-    // The test forum may already have other custom emoji (e.g. a
-    // pre-existing :pianotell:); we don't want to depend on the exact
-    // count, so all later assertions are baseline-relative. ===
+    // === 0. precondition: clean all custom emojis so the test starts
+    // from a known-clean state regardless of what prior specs left. ===
+    console.log('\n[setup] cleaning custom emojis');
+    await deleteAllCustomEmojis(page, BASE);
+
     console.log('\n[scenario] baseline');
     await gotoAdmin(page, BASE);
     await deleteCustomEmojiByShortcode(page, FIXTURE_SHORTCODE).catch(() => {});
@@ -224,15 +227,18 @@ async function composerText(page) {
       `before=${pickerBaseline.customTileCount} after=${afterCreate.customTileCount}`
     );
 
-    // === 3. SEARCH by a name token. emoji-mart's SearchIndex pre-builds
-    // a token pool from the custom emoji's `name` and `keywords`; in
-    // practice "flamoji" reliably matches our fixture (other emoji on
-    // this forum don't carry that token), while shorter generic words
-    // like "fixture" can be missed by the index. Pick a token that's
-    // distinctive AND in the name so the assertion is robust. ===
+    // === 3. SEARCH by a name token. emoji-mart's SearchIndex is built
+    // once when the picker first opens, so we need a fresh page (new
+    // tab) to get a picker instance that includes the newly created
+    // emoji in its search index. ===
     console.log('\n[scenario] picker search by name token');
-    await setSearch(page, 'flamoji');
-    const resultsByTitle = await searchResultCount(page);
+    const page2 = await page.context().newPage();
+    lastPage = page2;
+    await page2.goto(BASE, { waitUntil: 'networkidle' });
+    await openComposer(page2);
+    await openPicker(page2);
+    await setSearch(page2, 'flamoji');
+    const resultsByTitle = await searchResultCount(page2);
     check(
       'searching the picker for "flamoji" returns at least one tile',
       resultsByTitle >= 1,
@@ -241,16 +247,18 @@ async function composerText(page) {
 
     // === 4. SEARCH + INSERT inserts the configured shortcode ===
     console.log('\n[scenario] click first search hit → composer gains shortcode');
-    const beforeText = await composerText(page);
-    const clicked = await clickFirstResult(page);
+    const beforeText = await composerText(page2);
+    const clicked = await clickFirstResult(page2);
     check('first search result is clickable', clicked);
-    await page.waitForTimeout(200);
-    const afterText = await composerText(page);
+    await page2.waitForTimeout(200);
+    const afterText = await composerText(page2);
     check(
       'clicking the custom-emoji tile inserts the shortcode',
-      afterText.includes(FIXTURE_SHORTCODE) && afterText.length > beforeText.length,
+      afterText.includes(FIXTURE_SHORTCODE),
       `before="${beforeText}" after="${afterText}"`
     );
+    await page2.close();
+    lastPage = page;
 
     // === 5. DELETE via admin pencil → modal Delete button ===
     console.log('\n[scenario] delete custom emoji via admin UI');

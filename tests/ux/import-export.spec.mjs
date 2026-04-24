@@ -28,7 +28,9 @@ import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import {
   gotoAdmin,
+  addCustomEmoji,
   deleteCustomEmojiByShortcode,
+  deleteAllCustomEmojis,
   listCustomEmojiShortcodes,
 } from './_admin.mjs';
 
@@ -74,6 +76,19 @@ try {
     { name: 'flarum_remember', value: COOKIE, url: BASE },
   ]);
   const page = await ctx.newPage();
+
+  // ---- Precondition: clean slate + one seed emoji ----
+  // Clear any leftover custom emojis from prior specs, then seed one
+  // so the export test has data to export.
+  console.log('\n[setup] cleaning custom emojis and seeding one');
+  await deleteAllCustomEmojis(page, BASE);
+  await gotoAdmin(page, BASE);
+  await addCustomEmoji(page, {
+    title: 'Import Export Seed',
+    shortcode: ':flamoji_ie_seed:',
+    path: 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/64/1f600.png',
+  });
+  toCleanupShortcodes.push(':flamoji_ie_seed:');
 
   // ---- 1. Export ----
   console.log('\n[export] download flamoji.json via admin button');
@@ -152,8 +167,13 @@ try {
   // new row landed.
   await page.waitForLoadState('load', { timeout: 30_000 });
   await page.waitForTimeout(1500);
+  // Force a full reload to clear any stale app.store state, then
+  // navigate to the admin extension page.
+  await page.goto(BASE + '/admin', { waitUntil: 'networkidle' });
   await gotoAdmin(page, BASE);
   await page.waitForSelector('.customEmoji-list', { timeout: 10_000 });
+  // Wait for the list to finish loading (the API fetch is async after mount).
+  await page.waitForTimeout(2000);
 
   const shortcodes = await listCustomEmojiShortcodes(page);
   check('import → fixture row present in admin list',
