@@ -2,7 +2,7 @@
 
 [![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/PrimateCoder/flarum-flamoji/blob/master/LICENSE) [![Latest Stable Version](https://img.shields.io/packagist/v/pianotell/flarum-ext-flamoji.svg)](https://packagist.org/packages/pianotell/flarum-ext-flamoji) [![Total Downloads](https://img.shields.io/packagist/dt/pianotell/flarum-ext-flamoji.svg)](https://packagist.org/packages/pianotell/flarum-ext-flamoji)
 
-Simple emoji manager for Flarum.
+This is a simple but intuitive emoji picker for Flarum 1.x and 2.x.
 
 > **About this fork:** This is a fork of [`the-turk/flarum-flamoji`](https://discuss.flarum.org/d/28095-flamoji) (originally by [Hasan Özbey](https://github.com/the-turk)). This fork is published as [`pianotell/flarum-ext-flamoji`](https://github.com/PrimateCoder/flarum-flamoji) and was originally created for [🎹 Piano | Tell](https://pianotell.com), but now available to all. It has substantial changes from the original including replacing [emoji-button](https://github.com/joeattardi/emoji-button) with [emoji-mart](https://github.com/missive/emoji-mart). All credit for the original extension belongs to the original author.
 
