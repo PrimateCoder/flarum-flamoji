@@ -1,3 +1,7 @@
+### 2.0.2 — 2026-04-26
+
+- Move picker shadow fix from global CSS to JS inline style.
+
 ### 2.0.1 — 2026-04-26
 
 - Fix picker popup missing box-shadow (emoji-mart's `--shadow-color` CSS property clashed with Flarum's).
