@@ -4,17 +4,12 @@
 // it via the documented CSS custom properties; anything not exposed as a
 // custom prop lives behind the picker's Shadow DOM and is intentionally
 // left untouched.
-// Stash Flarum's --shadow-color at body level before emoji-mart can
-// override it on the picker element.
-body {
-  --flamoji-shadow-color: var(--shadow-color);
-}
-
 em-emoji-picker.flamoji-picker-popup {
   position: fixed;
   z-index: @zindex-modal; // float above composer (~1080); fixed positioning is page-scope
   border-radius: @border-radius;
-  box-shadow: 0 2px 6px var(--flamoji-shadow-color);
+  // box-shadow set via JS (injectEmojiMartRgbVars) because emoji-mart's
+  // custom element overrides Flarum's --shadow-color CSS property.
 
   // emoji-mart expects --rgb-* as comma-separated R,G,B triplets.
   // These can't be derived from Flarum's CSS custom properties in LESS

@@ -335,6 +335,14 @@ app.initializers.add(
       picker.style.setProperty('--rgb-input', input);
       picker.style.setProperty('--rgb-color', color);
       picker.style.setProperty('--rgb-accent', accent);
+
+      // emoji-mart sets its own --shadow-color that clashes with Flarum's.
+      // Read Flarum's value from the root (before emoji-mart overrides it)
+      // and apply the box-shadow directly as an inline style.
+      const shadowColor = style.getPropertyValue('--shadow-color').trim();
+      if (shadowColor) {
+        picker.style.boxShadow = `0 2px 6px ${shadowColor}`;
+      }
     }
 
     /**
