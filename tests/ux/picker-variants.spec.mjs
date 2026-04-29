@@ -15,44 +15,15 @@
 //
 // Set FLAMOJI_BASELINE_UPDATE=1 to accept new baselines.
 
-import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PNG } from 'pngjs';
-import pixelmatch from 'pixelmatch';
+import { runSpec, openComposer, compareScreenshot } from '../../.pianotell/tests/ux/helpers.mjs';
 import { applySettings, DEFAULTS, gotoAdmin, addCustomEmoji, deleteCustomEmojiByShortcode, deleteAllCustomEmojis } from './_admin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINES = resolve(HERE, '_baselines');
-
-const BASE = process.env.PIANOTELL_FLARUM_UX_BASE_URL;
-const COOKIE = process.env.PIANOTELL_FLARUM_UX_COOKIE;
 const UPDATE = process.env.FLAMOJI_BASELINE_UPDATE === '1';
-
-if (!BASE || !COOKIE) {
-  console.error(
-    'PIANOTELL_FLARUM_UX_BASE_URL and PIANOTELL_FLARUM_UX_COOKIE must be set.'
-  );
-  process.exit(2);
-}
-
-const failures = [];
-function check(label, ok, detail) {
-  if (ok) console.log(`  ✓ ${label}`);
-  else {
-    console.log(`  ✗ ${label}  ${detail ?? ''}`);
-    failures.push({ label, detail });
-  }
-}
-
-async function openComposer(page) {
-  for (const sel of ['.IndexPage-newDiscussion', 'button[onclick*="composer"]', 'button.Button--primary']) {
-    const btn = await page.$(sel);
-    if (btn) { await btn.click(); return; }
-  }
-  throw new Error('Could not find a "new discussion" button.');
-}
 
 async function openPicker(page) {
   await page.waitForSelector('button.Button-flamoji', { timeout: 10_000 });
@@ -100,54 +71,13 @@ async function capturePicker(page) {
   });
 }
 
-async function comparePixelBaseline(page, bbox, baselineFile, label) {
-  if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-    check(`${label} — has bounding box`, false, `bbox=${JSON.stringify(bbox)}`);
-    return;
-  }
-  check(`${label} — has bounding box`, true);
-
-  const actual = await page.screenshot({ clip: bbox, omitBackground: false });
-
-  if (UPDATE || !existsSync(baselineFile)) {
-    mkdirSync(BASELINES, { recursive: true });
-    writeFileSync(baselineFile, actual);
-    console.log(`  → baseline written: ${baselineFile} (${bbox.width}×${bbox.height})`);
-    return;
-  }
-
-  const expectedPng = PNG.sync.read(readFileSync(baselineFile));
-  const actualPng = PNG.sync.read(actual);
-
-  if (expectedPng.width !== actualPng.width || expectedPng.height !== actualPng.height) {
-    const actualFile = baselineFile.replace('.png', '-actual.png');
-    writeFileSync(actualFile, actual);
-    check(`${label} — pixel match`, false,
-      `dimensions changed: ${expectedPng.width}×${expectedPng.height} → ${actualPng.width}×${actualPng.height}. Wrote ${actualFile}`);
-    return;
-  }
-
-  const { width, height } = expectedPng;
-  const diff = new PNG({ width, height });
-  const mismatched = pixelmatch(expectedPng.data, actualPng.data, diff.data, width, height,
-    { threshold: 0.1, includeAA: false });
-  const pct = (mismatched / (width * height)) * 100;
-  const ok = pct <= 1.0;
-  if (!ok) {
-    writeFileSync(baselineFile.replace('.png', '-actual.png'), actual);
-    writeFileSync(baselineFile.replace('.png', '-diff.png'), PNG.sync.write(diff));
-  }
-  check(`${label} — pixel match (within 1%)`, ok,
-    ok ? `(${pct.toFixed(3)}%)` : `${pct.toFixed(3)}% diff. Re-run with FLAMOJI_BASELINE_UPDATE=1`);
-}
-
 // Each variant: { id, label, overrides, structural checks }
 const VARIANTS = [
   {
     id: 'native',
     label: 'picker_set=native',
     overrides: { ...DEFAULTS, picker_set: 'native' },
-    checks: (snap) => {
+    checks: (snap, check) => {
       check('native — picker visible', snap.visible);
       check('native — NO Twemoji sprite (uses system emoji)', !snap.firstTileHasSpriteBackground);
       check('native — search present', snap.hasSearchInput);
@@ -158,7 +88,7 @@ const VARIANTS = [
     id: 'no-skintone',
     label: 'show_variants=false',
     overrides: { ...DEFAULTS, show_variants: false },
-    checks: (snap) => {
+    checks: (snap, check) => {
       check('no-skintone — picker visible', snap.visible);
       check('no-skintone — skin-tone button absent', !snap.hasSkinToneButton);
       check('no-skintone — preview still present', snap.hasPreview);
@@ -168,7 +98,7 @@ const VARIANTS = [
     id: 'no-preview',
     label: 'show_preview=false',
     overrides: { ...DEFAULTS, show_preview: false },
-    checks: (snap) => {
+    checks: (snap, check) => {
       check('no-preview — picker visible', snap.visible);
       check('no-preview — preview absent', !snap.hasPreview);
       check('no-preview — search still present', snap.hasSearchInput);
@@ -178,7 +108,7 @@ const VARIANTS = [
     id: 'no-search',
     label: 'show_search=false',
     overrides: { ...DEFAULTS, show_search: false },
-    checks: (snap) => {
+    checks: (snap, check) => {
       check('no-search — picker visible', snap.visible);
       check('no-search — search absent', !snap.hasSearchInput);
       check('no-search — nav still present', snap.navCount >= 8);
@@ -189,7 +119,7 @@ const VARIANTS = [
     id: 'no-category',
     label: 'show_category_buttons=false',
     overrides: { ...DEFAULTS, show_category_buttons: false },
-    checks: (snap) => {
+    checks: (snap, check) => {
       check('no-category — picker visible', snap.visible);
       check('no-category — nav absent', snap.navCount === 0);
       check('no-category — search still present', snap.hasSearchInput);
@@ -200,7 +130,7 @@ const VARIANTS = [
     id: 'no-recents',
     label: 'show_recents=false',
     overrides: { ...DEFAULTS, show_recents: false },
-    checks: (snap) => {
+    checks: (snap, check) => {
       check('no-recents — picker visible', snap.visible);
       // "Recently Used" tab should be gone; other categories remain.
       const hasRecent = snap.navLabels.some((l) => /recent/i.test(l));
@@ -208,25 +138,45 @@ const VARIANTS = [
       check('no-recents — other categories still present', snap.navCount >= 7);
     },
   },
+  {
+    id: 'with-custom-emoji',
+    label: 'custom emoji present',
+    overrides: DEFAULTS,
+    // This variant needs a custom emoji in the DB to show the Custom tab.
+    // setup/teardown are called by the test loop.
+    setup: async (page, baseUrl) => {
+      await gotoAdmin(page, baseUrl);
+      await addCustomEmoji(page, {
+        title: 'Baseline Fixture',
+        shortcode: ':flamoji_baseline_fixture:',
+        path: 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/64/1f600.png',
+      });
+    },
+    teardown: async (page, baseUrl) => {
+      await gotoAdmin(page, baseUrl);
+      await deleteCustomEmojiByShortcode(page, ':flamoji_baseline_fixture:');
+    },
+    checks: (snap, check) => {
+      check('with-custom-emoji — picker visible', snap.visible);
+      const hasCustom = snap.navLabels.some((l) => /custom/i.test(l));
+      check('with-custom-emoji — Custom category tab present', hasCustom);
+      check('with-custom-emoji — nav has 10+ buttons (9 default + Custom)', snap.navCount >= 10);
+    },
+  },
 ];
 
-let browser;
-try {
-  browser = await chromium.launch();
-  const ctx = await browser.newContext({
-    ignoreHTTPSErrors: true,
-    viewport: { width: 1280, height: 900 },
-    deviceScaleFactor: 1,
-  });
-  await ctx.addCookies([{ name: 'flarum_remember', value: COOKIE, url: BASE }]);
-  const page = await ctx.newPage();
-
-  // Ensure clean state: no leftover custom emojis from prior specs.
+await runSpec({
+  specName: 'picker-variants',
+  outputDir: HERE,
+}, async ({ page, check, BASE }) => {
+  // Ensure clean state
   console.log('\n[setup] cleaning custom emojis');
   await deleteAllCustomEmojis(page, BASE);
 
   for (const variant of VARIANTS) {
     console.log(`\n[variant: ${variant.id}] applying ${variant.label}`);
+
+    if (variant.setup) await variant.setup(page, BASE);
     await applySettings(page, variant.overrides, BASE);
 
     await page.goto(BASE, { waitUntil: 'load' });
@@ -234,7 +184,7 @@ try {
     await openPicker(page);
 
     const snap = await snapshotPicker(page);
-    variant.checks(snap);
+    variant.checks(snap, check);
 
     // Structural baseline
     const structFile = resolve(BASELINES, `picker-${variant.id}.json`);
@@ -250,42 +200,32 @@ try {
         diffs.length ? `keys differ: ${diffs.join(', ')}` : '');
     }
 
-    // Pixel baseline (use twemoji for deterministic sprites, native for native)
+    // Pixel baseline
     const pixelFile = resolve(BASELINES, `picker-${variant.id}.png`);
     const bbox = await capturePicker(page);
-    await comparePixelBaseline(page, bbox, pixelFile, variant.id);
+    if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+      check(`${variant.id} — has bounding box`, false, `bbox=${JSON.stringify(bbox)}`);
+    } else {
+      check(`${variant.id} — has bounding box`, true);
+      const total = bbox.width * bbox.height;
+      const maxDiff = Math.ceil(total * 0.01);
+      const result = await compareScreenshot(page, {
+        baselinePath: pixelFile,
+        clip: bbox,
+        maxDiffPixels: maxDiff,
+        update: UPDATE,
+      });
+      check(`${variant.id} — pixel match (within 1%)`, result.pass, result.detail);
+    }
 
     // Close picker for next round
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
+
+    if (variant.teardown) await variant.teardown(page, BASE);
   }
 
   // Restore defaults for next spec
   console.log('\n[teardown] restoring defaults');
   await applySettings(page, DEFAULTS, BASE);
-
-} catch (err) {
-  failures.push({ label: 'unhandled exception', detail: err.message });
-  console.error(`  EXCEPTION: ${err.message}`);
-  if (browser) {
-    try {
-      const pages = browser.contexts().flatMap((c) => c.pages());
-      if (pages[0]) {
-        const shotPath = resolve(HERE, '_failure.png');
-        await pages[0].screenshot({ path: shotPath, fullPage: true });
-        console.error(`  saved failure screenshot to ${shotPath}`);
-      }
-    } catch {}
-  }
-} finally {
-  if (browser) await browser.close();
-}
-
-writeFileSync(resolve(HERE, '_failures.json'), JSON.stringify(failures, null, 2));
-
-if (failures.length) {
-  console.error(`\n${failures.length} check(s) failed:`);
-  for (const f of failures) console.error(` - ${f.label}: ${f.detail ?? ''}`);
-  process.exit(1);
-}
-console.log('\nAll picker-variants checks passed.');
+});

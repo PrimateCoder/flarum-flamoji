@@ -14,33 +14,19 @@
 // "skip ahead" with goes through the same Add/Edit/Delete flow a human
 // admin uses, so a regression in that flow fails the test.
 //
-// Inputs (env, mirrors the other specs):
-//   PIANOTELL_FLARUM_UX_BASE_URL    forum origin (e.g. https://localhost/)
-//   PIANOTELL_FLARUM_UX_COOKIE      flarum_remember cookie value (admin)
-//
 // Failure mode: writes tests/ux/_failure.png + _failures.json, exits non-zero.
 
-import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runSpec, openComposer } from '../../.pianotell/tests/ux/helpers.mjs';
 import {
   gotoAdmin,
   addCustomEmoji,
   deleteCustomEmojiByShortcode,
-  deleteAllCustomEmojis,
   listCustomEmojiShortcodes,
 } from './_admin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const BASE = process.env.PIANOTELL_FLARUM_UX_BASE_URL;
-const COOKIE = process.env.PIANOTELL_FLARUM_UX_COOKIE;
-if (!BASE || !COOKIE) {
-  console.error(
-    'PIANOTELL_FLARUM_UX_BASE_URL and PIANOTELL_FLARUM_UX_COOKIE must be set. See tests/ux/README.md.'
-  );
-  process.exit(2);
-}
 
 // Fixture identity. Title contains "fixture" so emoji-mart's prefix-
 // tokenised keyword index matches a search for "fixture". The path is
@@ -52,24 +38,7 @@ const FIXTURE_SHORTCODE = ':flamoji_ux_fixture:';
 const FIXTURE_PATH =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-const failures = [];
-function check(label, ok, detail) {
-  if (ok) console.log(`  ✓ ${label}`);
-  else {
-    console.log(`  ✗ ${label}  ${detail ?? ''}`);
-    failures.push({ label, detail });
-  }
-}
-
 // ---------- forum-side helpers (shared shape with picker-features) ----------
-
-async function openComposer(page) {
-  for (const sel of ['.IndexPage-newDiscussion', 'button[onclick*="composer"]', 'button.Button--primary']) {
-    const btn = await page.$(sel);
-    if (btn) { await btn.click(); return; }
-  }
-  throw new Error('Could not find a "new discussion" button to open the composer.');
-}
 
 async function openPicker(page) {
   await page.waitForSelector('button.Button-flamoji, button[title*="moji" i]', { timeout: 10_000 });
@@ -124,10 +93,6 @@ async function setSearch(page, q) {
   await page.waitForTimeout(400);
 }
 
-// emoji-mart renders search results inside a `.category` whose sticky
-// heading starts with "Search" (the default emoji-mart i18n string).
-// Buttons inside it carry `aria-posinset` but no `aria-label` — we
-// count clickable, non-radio buttons.
 async function searchResultCount(page) {
   return await page.evaluate(() => {
     const sr = document.querySelector('em-emoji-picker.flamoji-picker-popup').shadowRoot;
@@ -158,153 +123,128 @@ async function composerText(page) {
 
 // ---------- main ----------
 
-(async () => {
-  const browser = await chromium.launch();
-  let lastPage = null;
-  try {
-    const ctx = await browser.newContext({
-      ignoreHTTPSErrors: true,
-      viewport: { width: 1280, height: 900 },
-    });
-    await ctx.addCookies([{ name: 'flarum_remember', value: COOKIE, url: BASE }]);
-    const page = await ctx.newPage();
-    lastPage = page;
-    await page.context().setExtraHTTPHeaders({ 'cache-control': 'no-cache' });
+await runSpec({
+  specName: 'custom-emoji',
+  outputDir: HERE,
+}, async ({ page, check, BASE }) => {
+  await page.context().setExtraHTTPHeaders({ 'cache-control': 'no-cache' });
 
-    // === 0. precondition: clean all custom emojis so the test starts
-    // from a known-clean state regardless of what prior specs left. ===
-    console.log('\n[setup] cleaning custom emojis');
-    await deleteAllCustomEmojis(page, BASE);
+  // === 0. baseline: clean stale fixture (best-effort), then capture
+  // the pre-fixture state of both the admin list AND the forum picker.
+  // The test forum may already have other custom emoji (e.g. a
+  // pre-existing :pianotell:); we don't want to depend on the exact
+  // count, so all later assertions are baseline-relative. ===
+  console.log('\n[scenario] baseline');
+  await gotoAdmin(page, BASE);
+  await deleteCustomEmojiByShortcode(page, FIXTURE_SHORTCODE).catch(() => {});
+  const adminBaseline = await listCustomEmojiShortcodes(page);
+  console.log(`  → admin list baseline: ${JSON.stringify(adminBaseline)}`);
 
-    console.log('\n[scenario] baseline');
-    await gotoAdmin(page, BASE);
-    await deleteCustomEmojiByShortcode(page, FIXTURE_SHORTCODE).catch(() => {});
-    const adminBaseline = await listCustomEmojiShortcodes(page);
-    console.log(`  → admin list baseline: ${JSON.stringify(adminBaseline)}`);
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await openComposer(page);
+  await openPicker(page);
+  const pickerBaseline = await pickerSnapshot(page);
+  console.log(`  → picker baseline: customTileCount=${pickerBaseline.customTileCount}`);
 
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await openComposer(page);
-    await openPicker(page);
-    const pickerBaseline = await pickerSnapshot(page);
-    console.log(`  → picker baseline: customTileCount=${pickerBaseline.customTileCount}`);
+  // === 1. CREATE via admin "Add Emoji" modal ===
+  console.log('\n[scenario] create custom emoji via admin UI');
+  await gotoAdmin(page, BASE);
+  await addCustomEmoji(page, {
+    title: FIXTURE_TITLE,
+    shortcode: FIXTURE_SHORTCODE,
+    path: FIXTURE_PATH,
+  });
+  const adminAfterCreate = await listCustomEmojiShortcodes(page);
+  console.log(`  → admin list after create: ${JSON.stringify(adminAfterCreate)}`);
+  check(
+    'admin Custom Emojis list contains the new fixture row',
+    adminAfterCreate.includes(FIXTURE_SHORTCODE),
+    JSON.stringify(adminAfterCreate)
+  );
+  check(
+    'admin list grew by exactly one row after create',
+    adminAfterCreate.length === adminBaseline.length + 1,
+    `before=${adminBaseline.length} after=${adminAfterCreate.length}`
+  );
 
-    // === 1. CREATE via admin "Add Emoji" modal ===
-    console.log('\n[scenario] create custom emoji via admin UI');
-    await gotoAdmin(page, BASE);
-    await addCustomEmoji(page, {
-      title: FIXTURE_TITLE,
-      shortcode: FIXTURE_SHORTCODE,
-      path: FIXTURE_PATH,
-    });
-    const adminAfterCreate = await listCustomEmojiShortcodes(page);
-    console.log(`  → admin list after create: ${JSON.stringify(adminAfterCreate)}`);
-    check(
-      'admin Custom Emojis list contains the new fixture row',
-      adminAfterCreate.includes(FIXTURE_SHORTCODE),
-      JSON.stringify(adminAfterCreate)
-    );
-    check(
-      'admin list grew by exactly one row after create',
-      adminAfterCreate.length === adminBaseline.length + 1,
-      `before=${adminBaseline.length} after=${adminAfterCreate.length}`
-    );
+  // === 2. VISIBILITY in the forum picker ===
+  console.log('\n[scenario] custom emoji surfaces in forum picker');
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await openComposer(page);
+  await openPicker(page);
+  const afterCreate = await pickerSnapshot(page);
+  console.log(`  → picker after create: customTileCount=${afterCreate.customTileCount}`);
+  check(
+    'picker shows a Custom category nav button',
+    afterCreate.hasCustomNav,
+    `nav=${JSON.stringify(afterCreate.navLabels)}`
+  );
+  check(
+    'Custom category gains exactly one tile after admin create',
+    afterCreate.customTileCount === pickerBaseline.customTileCount + 1,
+    `before=${pickerBaseline.customTileCount} after=${afterCreate.customTileCount}`
+  );
 
-    // === 2. VISIBILITY in the forum picker ===
-    console.log('\n[scenario] custom emoji surfaces in forum picker');
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await openComposer(page);
-    await openPicker(page);
-    const afterCreate = await pickerSnapshot(page);
-    console.log(`  → picker after create: customTileCount=${afterCreate.customTileCount}`);
-    check(
-      'picker shows a Custom category nav button',
-      afterCreate.hasCustomNav,
-      `nav=${JSON.stringify(afterCreate.navLabels)}`
-    );
-    check(
-      'Custom category gains exactly one tile after admin create',
-      afterCreate.customTileCount === pickerBaseline.customTileCount + 1,
-      `before=${pickerBaseline.customTileCount} after=${afterCreate.customTileCount}`
-    );
+  // === 3. SEARCH by a name token. emoji-mart's SearchIndex pre-builds
+  // a token pool from the custom emoji's `name` and `keywords`; in
+  // practice "flamoji" reliably matches our fixture (other emoji on
+  // this forum don't carry that token), while shorter generic words
+  // like "fixture" can be missed by the index. Pick a token that's
+  // distinctive AND in the name so the assertion is robust. ===
+  // === 3. SEARCH by a name token. emoji-mart's SearchIndex is built
+  // once when the picker first opens, so we need a fresh page (new
+  // tab) to get a picker instance that includes the newly created
+  // emoji in its search index. ===
+  console.log('\n[scenario] picker search by name token');
+  const page2 = await page.context().newPage();
+  await page2.goto(BASE, { waitUntil: 'networkidle' });
+  await openComposer(page2);
+  await openPicker(page2);
+  await setSearch(page2, 'flamoji');
+  const resultsByTitle = await searchResultCount(page2);
+  check(
+    'searching the picker for "flamoji" returns at least one tile',
+    resultsByTitle >= 1,
+    `count=${resultsByTitle}`
+  );
 
-    // === 3. SEARCH by a name token. emoji-mart's SearchIndex is built
-    // once when the picker first opens, so we need a fresh page (new
-    // tab) to get a picker instance that includes the newly created
-    // emoji in its search index. ===
-    console.log('\n[scenario] picker search by name token');
-    const page2 = await page.context().newPage();
-    lastPage = page2;
-    await page2.goto(BASE, { waitUntil: 'networkidle' });
-    await openComposer(page2);
-    await openPicker(page2);
-    await setSearch(page2, 'flamoji');
-    const resultsByTitle = await searchResultCount(page2);
-    check(
-      'searching the picker for "flamoji" returns at least one tile',
-      resultsByTitle >= 1,
-      `count=${resultsByTitle}`
-    );
+  // === 4. SEARCH + INSERT inserts the configured shortcode ===
+  console.log('\n[scenario] click first search hit → composer gains shortcode');
+  const beforeText = await composerText(page2);
+  const clicked = await clickFirstResult(page2);
+  check('first search result is clickable', clicked);
+  await page2.waitForTimeout(200);
+  const afterText = await composerText(page2);
+  check(
+    'clicking the custom-emoji tile inserts the shortcode',
+    afterText.includes(FIXTURE_SHORTCODE),
+    `before="${beforeText}" after="${afterText}"`
+  );
+  await page2.close();
 
-    // === 4. SEARCH + INSERT inserts the configured shortcode ===
-    console.log('\n[scenario] click first search hit → composer gains shortcode');
-    const beforeText = await composerText(page2);
-    const clicked = await clickFirstResult(page2);
-    check('first search result is clickable', clicked);
-    await page2.waitForTimeout(200);
-    const afterText = await composerText(page2);
-    check(
-      'clicking the custom-emoji tile inserts the shortcode',
-      afterText.includes(FIXTURE_SHORTCODE),
-      `before="${beforeText}" after="${afterText}"`
-    );
-    await page2.close();
-    lastPage = page;
+  // === 5. DELETE via admin pencil → modal Delete button ===
+  console.log('\n[scenario] delete custom emoji via admin UI');
+  await gotoAdmin(page, BASE);
+  const deleted = await deleteCustomEmojiByShortcode(page, FIXTURE_SHORTCODE);
+  check('admin delete flow ran (row found, modal opened, Delete clicked)', deleted);
+  const adminAfterDelete = await listCustomEmojiShortcodes(page);
+  check(
+    'admin Custom Emojis list returns to baseline after delete',
+    adminAfterDelete.length === adminBaseline.length &&
+      !adminAfterDelete.includes(FIXTURE_SHORTCODE),
+    `baseline=${adminBaseline.length} after=${adminAfterDelete.length} list=${JSON.stringify(adminAfterDelete)}`
+  );
 
-    // === 5. DELETE via admin pencil → modal Delete button ===
-    console.log('\n[scenario] delete custom emoji via admin UI');
-    await gotoAdmin(page, BASE);
-    const deleted = await deleteCustomEmojiByShortcode(page, FIXTURE_SHORTCODE);
-    check('admin delete flow ran (row found, modal opened, Delete clicked)', deleted);
-    const adminAfterDelete = await listCustomEmojiShortcodes(page);
-    check(
-      'admin Custom Emojis list returns to baseline after delete',
-      adminAfterDelete.length === adminBaseline.length &&
-        !adminAfterDelete.includes(FIXTURE_SHORTCODE),
-      `baseline=${adminBaseline.length} after=${adminAfterDelete.length} list=${JSON.stringify(adminAfterDelete)}`
-    );
-
-    // === 6. PICKER returns to baseline tile count ===
-    console.log('\n[scenario] picker returns to baseline after delete');
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await openComposer(page);
-    await openPicker(page);
-    const afterDelete = await pickerSnapshot(page);
-    console.log(`  → picker after delete: customTileCount=${afterDelete.customTileCount}`);
-    check(
-      'Custom category tile count returns to baseline',
-      afterDelete.customTileCount === pickerBaseline.customTileCount,
-      `baseline=${pickerBaseline.customTileCount} after=${afterDelete.customTileCount}`
-    );
-
-    await ctx.close();
-    lastPage = null;
-  } catch (err) {
-    failures.push({ label: 'unhandled exception', detail: String(err) });
-    if (lastPage) {
-      mkdirSync(HERE, { recursive: true });
-      try {
-        await lastPage.screenshot({ path: resolve(HERE, '_failure.png'), fullPage: true });
-      } catch {}
-    }
-  } finally {
-    await browser.close();
-  }
-
-  if (failures.length) {
-    console.error(`\n${failures.length} check(s) failed:`);
-    for (const f of failures) console.error(` - ${f.label}: ${f.detail ?? ''}`);
-    writeFileSync(resolve(HERE, '_failures.json'), JSON.stringify(failures, null, 2));
-    process.exit(1);
-  }
-  console.log('\nAll custom-emoji checks passed.');
-})();
+  // === 6. PICKER returns to baseline tile count ===
+  console.log('\n[scenario] picker returns to baseline after delete');
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await openComposer(page);
+  await openPicker(page);
+  const afterDelete = await pickerSnapshot(page);
+  console.log(`  → picker after delete: customTileCount=${afterDelete.customTileCount}`);
+  check(
+    'Custom category tile count returns to baseline',
+    afterDelete.customTileCount === pickerBaseline.customTileCount,
+    `baseline=${pickerBaseline.customTileCount} after=${afterDelete.customTileCount}`
+  );
+});
