@@ -3,29 +3,13 @@
 // Spec:    tests/ux/README.md  (read first; this file asserts what's there)
 // Runtime: node tests/ux/picker-positioning.spec.mjs
 //
-// Inputs are read from the environment so no credential — not even a
-// test one — ever lands in the repo:
-//   PIANOTELL_FLARUM_UX_BASE_URL   forum origin (e.g. https://localhost/)
-//   PIANOTELL_FLARUM_UX_COOKIE     flarum_remember cookie value for an admin
-//                           (or any user who can post a discussion)
-//
 // Failure mode: writes tests/ux/_failure.png and exits non-zero.
 
-import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runSpec, openComposer } from '../../.pianotell/tests/ux/helpers.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-
-const BASE = process.env.PIANOTELL_FLARUM_UX_BASE_URL;
-const COOKIE = process.env.PIANOTELL_FLARUM_UX_COOKIE;
-if (!BASE || !COOKIE) {
-  console.error(
-    'PIANOTELL_FLARUM_UX_BASE_URL and PIANOTELL_FLARUM_UX_COOKIE must be set. See tests/ux/README.md.'
-  );
-  process.exit(2);
-}
 
 // Geometry tolerances. emoji-mart's Shadow DOM lays out asynchronously
 // and can settle a sub-pixel away from the math; allow ±2px on every
@@ -34,34 +18,7 @@ const PX_TOLERANCE = 2;
 const SPEC_MARGIN = 6;
 const SPEC_SCREEN_PADDING = 8;
 
-const failures = [];
-function check(label, ok, detail) {
-  if (ok) {
-    console.log(`  ✓ ${label}`);
-  } else {
-    console.log(`  ✗ ${label}  ${detail ?? ''}`);
-    failures.push({ label, detail });
-  }
-}
 const within = (a, b, tol = PX_TOLERANCE) => Math.abs(a - b) <= tol;
-
-async function openComposer(page) {
-  // The "Start a discussion" CTA varies by theme; try the canonical
-  // selectors in order and click the first one that resolves.
-  const selectors = [
-    '.IndexPage-newDiscussion',
-    'button[onclick*="composer"]',
-    'button.Button--primary',
-  ];
-  for (const sel of selectors) {
-    const btn = await page.$(sel);
-    if (btn) {
-      await btn.click();
-      return;
-    }
-  }
-  throw new Error('Could not find a "new discussion" button to open the composer.');
-}
 
 async function openPicker(page) {
   // The flamoji button is rendered in the editor toolbar. Match by either
@@ -107,7 +64,7 @@ async function snapshot(page) {
   });
 }
 
-async function assertSpec(scenario, snap) {
+function assertSpec(scenario, snap, check) {
   console.log(`[${scenario}] vw=${snap.vw} vh=${snap.vh}`);
   console.log(
     `  picker  ${JSON.stringify(snap.picker)}\n  button  ${JSON.stringify(snap.button)}`
@@ -198,62 +155,38 @@ async function assertSpec(scenario, snap) {
   }
 }
 
-(async () => {
-  const browser = await chromium.launch();
-  let lastPage = null;
-  try {
-    // Two viewports exercise both placement modes. 1280×800 is the
-    // canonical desktop; 480×800 is narrow enough that a button near the
-    // left edge of the composer toolbar will trip the fallback path.
-    for (const viewport of [
-      { width: 1280, height: 800 },
-      { width: 480, height: 800 },
-    ]) {
-      const ctx = await browser.newContext({
-        ignoreHTTPSErrors: true,
-        viewport,
-      });
-      await ctx.addCookies([
-        { name: 'flarum_remember', value: COOKIE, url: BASE },
-      ]);
-      const page = await ctx.newPage();
-      lastPage = page;
-      // Bypass the per-extension chunk cache by appending a one-shot
-      // version param. Webpack's chunkLoader honors the document URL but
-      // chunks are loaded by hard-coded filename — instead, just disable
-      // the HTTP cache for this run so we always get the latest dist.
-      await page.route('**/*', (route) => route.continue());
-      await page.context().setExtraHTTPHeaders({ 'cache-control': 'no-cache' });
+await runSpec({
+  specName: 'picker-positioning',
+  outputDir: HERE,
+}, async ({ browser, check, BASE, COOKIE }) => {
+  // Two viewports exercise both placement modes. 1280×800 is the
+  // canonical desktop; 480×800 is narrow enough that a button near the
+  // left edge of the composer toolbar will trip the fallback path.
+  for (const viewport of [
+    { width: 1280, height: 800 },
+    { width: 480, height: 800 },
+  ]) {
+    const ctx = await browser.newContext({
+      ignoreHTTPSErrors: true,
+      viewport,
+    });
+    await ctx.addCookies([
+      { name: 'flarum_remember', value: COOKIE, url: BASE },
+    ]);
+    const page = await ctx.newPage();
+    // Bypass the per-extension chunk cache by appending a one-shot
+    // version param. Webpack's chunkLoader honors the document URL but
+    // chunks are loaded by hard-coded filename — instead, just disable
+    // the HTTP cache for this run so we always get the latest dist.
+    await page.route('**/*', (route) => route.continue());
+    await page.context().setExtraHTTPHeaders({ 'cache-control': 'no-cache' });
 
-      await page.goto(BASE, { waitUntil: 'networkidle' });
-      await openComposer(page);
-      await openPicker(page);
-      const snap = await snapshot(page);
-      await assertSpec(`${viewport.width}x${viewport.height}`, snap);
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await openComposer(page);
+    await openPicker(page);
+    const snap = await snapshot(page);
+    assertSpec(`${viewport.width}x${viewport.height}`, snap, check);
 
-      await ctx.close();
-      lastPage = null;
-    }
-  } catch (err) {
-    failures.push({ label: 'unhandled exception', detail: String(err) });
-    if (lastPage) {
-      mkdirSync(HERE, { recursive: true });
-      try {
-        await lastPage.screenshot({ path: resolve(HERE, '_failure.png'), fullPage: true });
-      } catch {}
-    }
-  } finally {
-    await browser.close();
+    await ctx.close();
   }
-
-  if (failures.length) {
-    console.error(`\n${failures.length} check(s) failed:`);
-    for (const f of failures) console.error(` - ${f.label}: ${f.detail ?? ''}`);
-    writeFileSync(
-      resolve(HERE, '_failures.json'),
-      JSON.stringify(failures, null, 2)
-    );
-    process.exit(1);
-  }
-  console.log('\nAll picker-positioning checks passed.');
-})();
+});

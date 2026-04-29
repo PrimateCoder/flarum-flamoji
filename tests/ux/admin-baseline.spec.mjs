@@ -6,82 +6,20 @@
 // Baselines are captured against default settings.
 // Set FLAMOJI_BASELINE_UPDATE=1 to accept new baselines.
 
-import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PNG } from 'pngjs';
-import pixelmatch from 'pixelmatch';
+import { runSpec, compareScreenshot } from '../../.pianotell/tests/ux/helpers.mjs';
 import { applySettings, DEFAULTS, gotoAdmin } from './_admin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINES = resolve(HERE, '_baselines');
-
-const BASE = process.env.PIANOTELL_FLARUM_UX_BASE_URL;
-const COOKIE = process.env.PIANOTELL_FLARUM_UX_COOKIE;
 const UPDATE = process.env.FLAMOJI_BASELINE_UPDATE === '1';
 
-if (!BASE || !COOKIE) {
-  console.error(
-    'PIANOTELL_FLARUM_UX_BASE_URL and PIANOTELL_FLARUM_UX_COOKIE must be set.'
-  );
-  process.exit(2);
-}
-
-const failures = [];
-function check(label, ok, detail) {
-  if (ok) console.log(`  ✓ ${label}`);
-  else {
-    console.log(`  ✗ ${label}  ${detail ?? ''}`);
-    failures.push({ label, detail });
-  }
-}
-
-async function comparePixelBaseline(page, clip, baselineFile, label) {
-  const actual = await page.screenshot({ clip, omitBackground: false });
-
-  if (UPDATE || !existsSync(baselineFile)) {
-    mkdirSync(BASELINES, { recursive: true });
-    writeFileSync(baselineFile, actual);
-    console.log(`  → baseline written: ${baselineFile} (${clip.width}×${clip.height})`);
-    return;
-  }
-
-  const expectedPng = PNG.sync.read(readFileSync(baselineFile));
-  const actualPng = PNG.sync.read(actual);
-
-  if (expectedPng.width !== actualPng.width || expectedPng.height !== actualPng.height) {
-    writeFileSync(baselineFile.replace('.png', '-actual.png'), actual);
-    check(`${label} — pixel match`, false,
-      `dimensions changed: ${expectedPng.width}×${expectedPng.height} → ${actualPng.width}×${actualPng.height}`);
-    return;
-  }
-
-  const { width, height } = expectedPng;
-  const diff = new PNG({ width, height });
-  const mismatched = pixelmatch(expectedPng.data, actualPng.data, diff.data, width, height,
-    { threshold: 0.1, includeAA: false });
-  const pct = (mismatched / (width * height)) * 100;
-  const ok = pct <= 1.5; // admin pages have more text reflow variance
-  if (!ok) {
-    writeFileSync(baselineFile.replace('.png', '-actual.png'), actual);
-    writeFileSync(baselineFile.replace('.png', '-diff.png'), PNG.sync.write(diff));
-  }
-  check(`${label} — pixel match (within 1.5%)`, ok,
-    ok ? `(${pct.toFixed(3)}%)` : `${pct.toFixed(3)}% diff. Re-run with FLAMOJI_BASELINE_UPDATE=1`);
-}
-
-let browser;
-try {
-  browser = await chromium.launch();
-  const ctx = await browser.newContext({
-    ignoreHTTPSErrors: true,
-    viewport: { width: 1280, height: 900 },
-    deviceScaleFactor: 1,
-  });
-  await ctx.addCookies([{ name: 'flarum_remember', value: COOKIE, url: BASE }]);
-  const page = await ctx.newPage();
-
+await runSpec({
+  specName: 'admin-baseline',
+  outputDir: HERE,
+}, async ({ page, check, BASE }) => {
   // Ensure defaults
   console.log('\n[setup] restoring defaults');
   await applySettings(page, DEFAULTS, BASE);
@@ -166,8 +104,15 @@ try {
   });
   check('settings panel has bounding box', !!settingsBox && settingsBox.width > 0);
   if (settingsBox && settingsBox.width > 0) {
-    await comparePixelBaseline(page, settingsBox,
-      resolve(BASELINES, 'admin-settings.png'), 'admin-settings');
+    const total = settingsBox.width * settingsBox.height;
+    const maxDiff = Math.ceil(total * 0.015); // admin pages have more text reflow variance
+    const result = await compareScreenshot(page, {
+      baselinePath: resolve(BASELINES, 'admin-settings.png'),
+      clip: settingsBox,
+      maxDiffPixels: maxDiff,
+      update: UPDATE,
+    });
+    check('admin-settings — pixel match (within 1.5%)', result.pass, result.detail);
   }
 
   // ---- Pixel baseline of custom emoji section ----
@@ -185,32 +130,14 @@ try {
   });
   check('custom emoji section has bounding box', !!emojiBox && emojiBox.width > 0);
   if (emojiBox && emojiBox.width > 0) {
-    await comparePixelBaseline(page, emojiBox,
-      resolve(BASELINES, 'admin-custom-emojis.png'), 'admin-custom-emojis');
+    const total = emojiBox.width * emojiBox.height;
+    const maxDiff = Math.ceil(total * 0.015);
+    const result = await compareScreenshot(page, {
+      baselinePath: resolve(BASELINES, 'admin-custom-emojis.png'),
+      clip: emojiBox,
+      maxDiffPixels: maxDiff,
+      update: UPDATE,
+    });
+    check('admin-custom-emojis — pixel match (within 1.5%)', result.pass, result.detail);
   }
-
-} catch (err) {
-  failures.push({ label: 'unhandled exception', detail: err.message });
-  console.error(`  EXCEPTION: ${err.message}`);
-  if (browser) {
-    try {
-      const pages = browser.contexts().flatMap((c) => c.pages());
-      if (pages[0]) {
-        const shotPath = resolve(HERE, '_failure.png');
-        await pages[0].screenshot({ path: shotPath, fullPage: true });
-        console.error(`  saved failure screenshot to ${shotPath}`);
-      }
-    } catch {}
-  }
-} finally {
-  if (browser) await browser.close();
-}
-
-writeFileSync(resolve(HERE, '_failures.json'), JSON.stringify(failures, null, 2));
-
-if (failures.length) {
-  console.error(`\n${failures.length} check(s) failed:`);
-  for (const f of failures) console.error(` - ${f.label}: ${f.detail ?? ''}`);
-  process.exit(1);
-}
-console.log('\nAll admin-baseline checks passed.');
+});
