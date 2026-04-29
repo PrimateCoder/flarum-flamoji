@@ -298,7 +298,22 @@ export async function deleteCustomEmojiByShortcode(page, shortcode) {
         (i) => i.getAttribute('title') === sc
       ),
     shortcode,
-    { timeout: 5_000 }
+    { timeout: 10_000 }
   );
   return true;
+}
+
+// Delete every custom emoji in the admin list. Iterates until the list
+// is empty, so baseline specs start from a known-clean state regardless
+// of what prior specs left behind.
+export async function deleteAllCustomEmojis(page, baseUrl) {
+  await gotoAdmin(page, baseUrl);
+  let shortcodes = await listCustomEmojiShortcodes(page);
+  while (shortcodes.length > 0) {
+    for (const sc of shortcodes) {
+      const deleted = await deleteCustomEmojiByShortcode(page, sc);
+      if (!deleted) break;
+    }
+    shortcodes = await listCustomEmojiShortcodes(page);
+  }
 }

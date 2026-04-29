@@ -9,53 +9,13 @@
 // our source code says it does. emoji-mart renders inside Shadow DOM, so
 // every selector below pierces `picker.shadowRoot`.
 //
-// Inputs (env, mirrors picker-positioning.spec.mjs):
-//   PIANOTELL_FLARUM_UX_BASE_URL    forum origin (e.g. https://localhost/)
-//   PIANOTELL_FLARUM_UX_COOKIE      flarum_remember cookie value
-//
 // Failure mode: writes tests/ux/_failure.png and exits non-zero.
 
-import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runSpec, openComposer } from '../../.pianotell/tests/ux/helpers.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-
-const BASE = process.env.PIANOTELL_FLARUM_UX_BASE_URL;
-const COOKIE = process.env.PIANOTELL_FLARUM_UX_COOKIE;
-if (!BASE || !COOKIE) {
-  console.error(
-    'PIANOTELL_FLARUM_UX_BASE_URL and PIANOTELL_FLARUM_UX_COOKIE must be set. See tests/ux/README.md.'
-  );
-  process.exit(2);
-}
-
-const failures = [];
-function check(label, ok, detail) {
-  if (ok) {
-    console.log(`  ✓ ${label}`);
-  } else {
-    console.log(`  ✗ ${label}  ${detail ?? ''}`);
-    failures.push({ label, detail });
-  }
-}
-
-async function openComposer(page) {
-  const selectors = [
-    '.IndexPage-newDiscussion',
-    'button[onclick*="composer"]',
-    'button.Button--primary',
-  ];
-  for (const sel of selectors) {
-    const btn = await page.$(sel);
-    if (btn) {
-      await btn.click();
-      return;
-    }
-  }
-  throw new Error('Could not find a "new discussion" button to open the composer.');
-}
 
 async function openPicker(page) {
   await page.waitForSelector('button.Button-flamoji, button[title*="moji" i]', {
@@ -163,146 +123,114 @@ async function searchResultLabels(page) {
   });
 }
 
-(async () => {
-  const browser = await chromium.launch();
-  let lastPage = null;
-  try {
-    const ctx = await browser.newContext({
-      ignoreHTTPSErrors: true,
-      viewport: { width: 1280, height: 900 },
-    });
-    await ctx.addCookies([{ name: 'flarum_remember', value: COOKIE, url: BASE }]);
-    const page = await ctx.newPage();
-    lastPage = page;
-    await page.context().setExtraHTTPHeaders({ 'cache-control': 'no-cache' });
-    await page.goto(BASE, { waitUntil: 'networkidle' });
-    await openComposer(page);
-    await openPicker(page);
+await runSpec({
+  specName: 'picker-features',
+  outputDir: HERE,
+}, async ({ page, check, BASE }) => {
+  await page.context().setExtraHTTPHeaders({ 'cache-control': 'no-cache' });
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await openComposer(page);
+  await openPicker(page);
 
-    // === 1. STRUCTURE — every "all on" toggle produces its UI region ===
-    const snap = await snapshotFeatures(page);
-    console.log('[features] picker snapshot:');
-    console.log(`  navCount=${snap.navCount}`);
-    console.log(`  navLabels=${JSON.stringify(snap.navLabels)}`);
-    console.log(`  previewText="${snap.previewText}"`);
+  // === 1. STRUCTURE — every "all on" toggle produces its UI region ===
+  const snap = await snapshotFeatures(page);
+  console.log('[features] picker snapshot:');
+  console.log(`  navCount=${snap.navCount}`);
+  console.log(`  navLabels=${JSON.stringify(snap.navLabels)}`);
+  console.log(`  previewText="${snap.previewText}"`);
 
+  check(
+    'show_search → search input visible',
+    snap.hasSearchInput,
+    `hasSearchInput=${snap.hasSearchInput}`
+  );
+
+  check(
+    'show_category_buttons → category nav rendered with 7+ buttons',
+    snap.navCount >= 7,
+    `got ${snap.navCount}: ${JSON.stringify(snap.navLabels)}`
+  );
+
+  check(
+    'show_preview → preview placeholder rendered with hint text',
+    snap.hasPreview && /pick an emoji/i.test(snap.previewText || ''),
+    `hasPreview=${snap.hasPreview} text="${snap.previewText}"`
+  );
+
+  check(
+    'show_variants → skin-tone selector rendered (lives in preview row)',
+    snap.hasSkinToneButton,
+    `hasSkinToneButton=${snap.hasSkinToneButton}`
+  );
+
+  // Expected categories (from default specify_categories). Match
+  // case-insensitively against the human-readable nav labels emoji-mart
+  // renders ("Smileys & People", "Animals & Nature", ...).
+  const expectedCategoryAliases = {
+    people: /smileys|people/i,
+    nature: /nature|animals/i,
+    foods: /food/i,
+    activity: /activit/i,
+    places: /places|travel/i,
+    objects: /object/i,
+    symbols: /symbol/i,
+  };
+  for (const [id, re] of Object.entries(expectedCategoryAliases)) {
     check(
-      'show_search → search input visible',
-      snap.hasSearchInput,
-      `hasSearchInput=${snap.hasSearchInput}`
+      `category "${id}" is reachable from nav`,
+      snap.navLabels.some((l) => re.test(l)),
+      `nav=${JSON.stringify(snap.navLabels)}`
     );
-
-    check(
-      'show_category_buttons → category nav rendered with 7+ buttons',
-      snap.navCount >= 7,
-      `got ${snap.navCount}: ${JSON.stringify(snap.navLabels)}`
-    );
-
-    check(
-      'show_preview → preview placeholder rendered with hint text',
-      snap.hasPreview && /pick an emoji/i.test(snap.previewText || ''),
-      `hasPreview=${snap.hasPreview} text="${snap.previewText}"`
-    );
-
-    check(
-      'show_variants → skin-tone selector rendered (lives in preview row)',
-      snap.hasSkinToneButton,
-      `hasSkinToneButton=${snap.hasSkinToneButton}`
-    );
-
-    // Expected categories (from default specify_categories). Match
-    // case-insensitively against the human-readable nav labels emoji-mart
-    // renders ("Smileys & People", "Animals & Nature", ...).
-    const expectedCategoryAliases = {
-      people: /smileys|people/i,
-      nature: /nature|animals/i,
-      foods: /food/i,
-      activity: /activit/i,
-      places: /places|travel/i,
-      objects: /object/i,
-      symbols: /symbol/i,
-    };
-    for (const [id, re] of Object.entries(expectedCategoryAliases)) {
-      check(
-        `category "${id}" is reachable from nav`,
-        snap.navLabels.some((l) => re.test(l)),
-        `nav=${JSON.stringify(snap.navLabels)}`
-      );
-    }
-
-    // === 2. INSERT — clicking an emoji writes into the composer ===
-    const beforeText = (await composerText(page)) ?? '';
-    const picked = await pickFirstEmoji(page);
-    console.log(`[features] picked first emoji: ${JSON.stringify(picked)}`);
-    check('first emoji tile is clickable', picked.ok, picked.reason || '');
-
-    // emoji-mart fires onEmojiSelect synchronously, but the editor's
-    // insertAtCursor hop through Mithril takes a tick.
-    await page.waitForTimeout(150);
-
-    const afterText = (await composerText(page)) ?? '';
-    check(
-      'onEmojiSelect → composer textarea grows',
-      afterText.length > beforeText.length,
-      `before="${beforeText}" after="${afterText}"`
-    );
-
-    // === 3. AUTO-HIDE — picker disappears after a successful pick ===
-    const visibleAfter = await page.evaluate(() => {
-      const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
-      return p && p.style.display !== 'none';
-    });
-    check(
-      'auto_hide → picker hidden after selection',
-      !visibleAfter,
-      `style.display still visible`
-    );
-
-    // === 4. SEARCH — re-open picker, type, results filter ===
-    await openPicker(page);
-    await setSearch(page, 'smile');
-    const results = await searchResultLabels(page);
-    console.log(`[features] search results (top 20): ${JSON.stringify(results)}`);
-    check(
-      'show_search → typing filters the visible tiles',
-      results.length > 0 && results.length < 30,
-      `got ${results.length} tiles`
-    );
-
-    // Negative search: a junk query must produce strictly fewer tiles
-    // than the meaningful one. (We can't easily map glyphs back to names
-    // to assert "every result is a smile" — emoji-mart sets aria-label
-    // to the glyph itself, not the keyword. Instead, flex the filter.)
-    await setSearch(page, 'zzznotanemoji');
-    const emptyResults = await searchResultLabels(page);
-    check(
-      'show_search → unmatched query returns no tiles',
-      emptyResults.length === 0,
-      `expected 0 tiles, got ${emptyResults.length}: ${JSON.stringify(emptyResults)}`
-    );
-
-    await ctx.close();
-    lastPage = null;
-  } catch (err) {
-    failures.push({ label: 'unhandled exception', detail: String(err) });
-    if (lastPage) {
-      mkdirSync(HERE, { recursive: true });
-      try {
-        await lastPage.screenshot({ path: resolve(HERE, '_failure.png'), fullPage: true });
-      } catch {}
-    }
-  } finally {
-    await browser.close();
   }
 
-  if (failures.length) {
-    console.error(`\n${failures.length} check(s) failed:`);
-    for (const f of failures) console.error(` - ${f.label}: ${f.detail ?? ''}`);
-    writeFileSync(
-      resolve(HERE, '_failures.json'),
-      JSON.stringify(failures, null, 2)
-    );
-    process.exit(1);
-  }
-  console.log('\nAll picker-features checks passed.');
-})();
+  // === 2. INSERT — clicking an emoji writes into the composer ===
+  const beforeText = (await composerText(page)) ?? '';
+  const picked = await pickFirstEmoji(page);
+  console.log(`[features] picked first emoji: ${JSON.stringify(picked)}`);
+  check('first emoji tile is clickable', picked.ok, picked.reason || '');
+
+  // emoji-mart fires onEmojiSelect synchronously, but the editor's
+  // insertAtCursor hop through Mithril takes a tick.
+  await page.waitForTimeout(150);
+
+  const afterText = (await composerText(page)) ?? '';
+  check(
+    'onEmojiSelect → composer textarea grows',
+    afterText.length > beforeText.length,
+    `before="${beforeText}" after="${afterText}"`
+  );
+
+  // === 3. AUTO-HIDE — picker disappears after a successful pick ===
+  const visibleAfter = await page.evaluate(() => {
+    const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
+    return p && p.style.display !== 'none';
+  });
+  check(
+    'auto_hide → picker hidden after selection',
+    !visibleAfter,
+    `style.display still visible`
+  );
+
+  // === 4. SEARCH — re-open picker, type, results filter ===
+  await openPicker(page);
+  await setSearch(page, 'smile');
+  const results = await searchResultLabels(page);
+  console.log(`[features] search results (top 20): ${JSON.stringify(results)}`);
+  check(
+    'show_search → typing filters the visible tiles',
+    results.length > 0 && results.length < 30,
+    `got ${results.length} tiles`
+  );
+
+  // Negative search: a junk query must produce strictly fewer tiles
+  // than the meaningful one. (We can't easily map glyphs back to names
+  // to assert "every result is a smile" — emoji-mart sets aria-label
+  // to the glyph itself, not the keyword. Instead, flex the filter.)
+  await setSearch(page, 'zzznotanemoji');
+  const emptyResults = await searchResultLabels(page);
+  check(
+    'show_search → unmatched query returns no tiles',
+    emptyResults.length === 0,
+    `expected 0 tiles, got ${emptyResults.length}: ${JSON.stringify(emptyResults)}`
+  );
+});
