@@ -39,6 +39,7 @@ export const DEFAULTS = Object.freeze({
   show_variants: true,
   show_category_buttons: true,
   show_recents: true,
+  prepopulate_recents: true,
   picker_set: 'auto',
   frequent_rows: 4,
   // All eight categories enabled = "no narrowing".
@@ -54,7 +55,7 @@ const SWITCH_LABELS = {
   show_search: 'Show search input',
   show_variants: 'Show skin-tone variants',
   show_category_buttons: 'Show category buttons',
-  show_recents: 'Show (and save) most recently used emojis',
+  show_recents: 'Show (and save) frequently used emojis',
 };
 
 export async function gotoAdmin(page, baseUrl) {
@@ -152,6 +153,15 @@ export async function applySettings(page, overrides, baseUrl) {
     if (key in overrides) await setSwitch(page, label, !!overrides[key]);
   }
   if ('picker_set' in overrides) await setSelectByValue(page, overrides.picker_set);
+  if ('prepopulate_recents' in overrides) {
+    // Only renders when show_recents is ON. Skip if show_recents is
+    // being turned OFF in this same call (the switch won't be in the DOM).
+    const recentsOn = 'show_recents' in overrides ? !!overrides.show_recents : true;
+    if (recentsOn) {
+      await page.waitForTimeout(200);
+      await setSwitch(page, 'Pre-populate with popular emojis', !!overrides.prepopulate_recents);
+    }
+  }
   if ('frequent_rows' in overrides) {
     // The Frequent emoji rows input only renders when show_recents is
     // ON. Caller's responsibility to ensure that — we don't toggle it

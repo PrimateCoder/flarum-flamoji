@@ -55,7 +55,7 @@ config.output = {
 // emoji-mart's published `dist/module.js` is already shipped as browser-
 // targeted ES — skip babel for it (and any other already-compiled dep).
 const babelRule = config.module.rules.find(
-  (r) => r.loader === 'babel-loader'
+  (r) => r.loader && r.loader.includes('babel-loader')
 );
 if (babelRule) {
   babelRule.exclude = /node_modules\/(emoji-mart|@emoji-mart)\//;

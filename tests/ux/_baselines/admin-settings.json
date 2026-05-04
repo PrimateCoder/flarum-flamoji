@@ -21,7 +21,11 @@
       "checked": true
     },
     {
-      "label": "Show (and save) most recently used emojis",
+      "label": "Show (and save) frequently used emojis",
+      "checked": true
+    },
+    {
+      "label": "Pre-populate with popular emojis",
       "checked": true
     }
   ],
@@ -62,5 +66,5 @@
     }
   ],
   "customEmojiSection": true,
-  "customEmojiCount": 0
+  "customEmojiCount": 1
 }
