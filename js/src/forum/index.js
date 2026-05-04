@@ -482,6 +482,7 @@ app.initializers.add(
 
       const autoHide = !!app.forum.attribute('flamoji.auto_hide');
       const showRecents = !!app.forum.attribute('flamoji.show_recents');
+      const prepopulateRecents = !!app.forum.attribute('flamoji.prepopulate_recents');
       const showPreview = !!app.forum.attribute('flamoji.show_preview');
       const showSearch = !!app.forum.attribute('flamoji.show_search');
       const showVariants = !!app.forum.attribute('flamoji.show_variants');
@@ -504,6 +505,17 @@ app.initializers.add(
       const pickerSet = app.forum.attribute('flamoji.picker_set') || 'auto';
       const hasEmojiExt = !!app.forum.attribute('flamoji.has_emoji_extension');
       const useTwemoji = pickerSet === 'twemoji' || (pickerSet === 'auto' && hasEmojiExt);
+
+      // When prepopulate is OFF, seed emoji-mart's localStorage with an
+      // empty frequently-used index so it doesn't fall back to its
+      // hardcoded popular-emoji defaults. Once the user picks an emoji,
+      // emoji-mart overwrites this with real data that persists normally.
+      if (showRecents && !prepopulateRecents) {
+        const key = 'emoji-mart.frequently';
+        if (!window.localStorage.getItem(key)) {
+          window.localStorage.setItem(key, JSON.stringify({}));
+        }
+      }
 
       const picker = new Picker({
         data,

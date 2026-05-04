@@ -1,3 +1,8 @@
+### 2.1.0 — 2026-05-03
+
+- **New admin setting: "Pre-populate with popular emojis"** — controls whether the Frequently Used tab starts with emoji-mart's built-in popular defaults or begins empty. Default ON preserves existing behavior. When OFF, the tab appears only after the user picks their first emoji; picks persist in localStorage.
+- Renamed "Recently Used" to "Frequently Used" throughout (locale key unchanged — existing translations are unaffected).
+
 ### 2.0.2 — 2026-04-26
 
 - Move picker shadow fix from global CSS to JS inline style.
