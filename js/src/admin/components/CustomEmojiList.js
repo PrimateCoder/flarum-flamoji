@@ -1,3 +1,10 @@
+/*
+ * This file is part of Flamoji.
+ *
+ * For detailed copyright and license information, please view the
+ * LICENSE file that was distributed with this source code.
+ */
+
 import app from 'flarum/common/app';
 import Button from 'flarum/common/components/Button';
 import Component from 'flarum/common/Component';
