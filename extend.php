@@ -4,6 +4,7 @@
  * This file is part of pianotell/flarum-ext-flamoji.
  *
  * Copyright (c) 2021 Hasan Özbey
+ * Copyright (c) 2026 Navindra Umanee
  *
  * LICENSE: For the full copyright and license information,
  * please view the LICENSE file that was distributed

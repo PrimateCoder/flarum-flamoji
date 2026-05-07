@@ -1,3 +1,10 @@
+/*
+ * This file is part of Flamoji.
+ *
+ * For detailed copyright and license information, please view the
+ * LICENSE file that was distributed with this source code.
+ */
+
 // emoji-mart category IDs. See @emoji-mart/data sets/*/native.json -> categories[].id.
 // Note: emoji-mart merges what emoji-button called "smileys" + "people" into a single
 // "people" category. Other IDs differ from the legacy emoji-button names; the
