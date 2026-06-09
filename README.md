@@ -8,7 +8,7 @@ Simple emoji manager for Flarum.
 
 Screenshot:
 
-![Picker](docs/screenshots/picker.png)
+![Picker](https://raw.githubusercontent.com/PrimateCoder/flarum-flamoji/main/docs/screenshots/picker.png)
 
 ## Features
 
