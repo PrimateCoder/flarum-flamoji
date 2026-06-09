@@ -8,7 +8,7 @@ This is a simple but intuitive emoji picker for Flarum 1.x and 2.x.
 
 Screenshot:
 
-![Picker](docs/screenshots/picker.png)
+![Picker](https://raw.githubusercontent.com/PrimateCoder/flarum-flamoji/main/docs/screenshots/picker.png)
 
 ## Features
 
