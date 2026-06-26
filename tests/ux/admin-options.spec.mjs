@@ -34,7 +34,7 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runSpec, openComposer } from '../../.pianotell/tests/ux/helpers.mjs';
-import { applySettings, restoreDefaults, DEFAULTS } from './_admin.mjs';
+import { applySettings, restoreDefaults, DEFAULTS, deleteAllCustomEmojis } from './_admin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -145,6 +145,12 @@ await runSpec({
   // any DB drift from earlier admin sessions.
   console.log('\n[setup] restoring all-on defaults via admin UI');
   await restoreDefaults(page, BASE);
+
+  // Remove any custom emoji so the nav-count assertions (esp.
+  // specify_categories) are independent of ambient custom categories,
+  // which would otherwise add extra tabs (one per category).
+  console.log('[setup] clearing custom emoji for deterministic nav counts');
+  await deleteAllCustomEmojis(page, BASE);
 
   // --- 1. show_search ON / OFF ---
   console.log('\n[scenario] show_search=true (baseline ON)');

@@ -105,6 +105,48 @@ class EmojisApiTest extends TestCase
         $this->assertNotNull($emoji);
         $this->assertSame('Party', $emoji->title);
         $this->assertSame('/party.png', $emoji->path);
+        // A create with no `category` attribute (legacy client) persists null.
+        $this->assertNull($emoji->category);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function create_endpoint_persists_category_for_admin(): void
+    {
+        $response = $this->send($this->request('POST', '/api/flamojis', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => [
+                'title' => 'Doge',
+                'text_to_replace' => ':doge:',
+                'path' => '/doge.png',
+                'category' => '  Memes  ',
+            ]]],
+        ]));
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $emoji = Emoji::where('text_to_replace', ':doge:')->first();
+        $this->assertNotNull($emoji);
+        $this->assertSame('Memes', $emoji->category);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function create_endpoint_normalizes_blank_category_to_null(): void
+    {
+        $response = $this->send($this->request('POST', '/api/flamojis', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => [
+                'title' => 'Plain',
+                'text_to_replace' => ':plain:',
+                'path' => '/plain.png',
+                'category' => '   ',
+            ]]],
+        ]));
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $emoji = Emoji::where('text_to_replace', ':plain:')->first();
+        $this->assertNotNull($emoji);
+        $this->assertNull($emoji->category);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -200,6 +242,41 @@ class EmojisApiTest extends TestCase
         $this->assertEquals(204, $response->getStatusCode());
         $this->assertNotNull(Emoji::where('text_to_replace', ':a:')->first());
         $this->assertNotNull(Emoji::where('text_to_replace', ':b:')->first());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function import_endpoint_persists_category_and_defaults_blank_to_null(): void
+    {
+        $response = $this->send($this->request('POST', '/api/flamojis/import', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => [
+                ['title' => 'A', 'text_to_replace' => ':a:', 'path' => '/a.png', 'category' => 'Memes'],
+                ['title' => 'B', 'text_to_replace' => ':b:', 'path' => '/b.png'],
+            ]],
+        ]));
+
+        $this->assertEquals(204, $response->getStatusCode());
+        $this->assertSame('Memes', Emoji::where('text_to_replace', ':a:')->first()->category);
+        $this->assertNull(Emoji::where('text_to_replace', ':b:')->first()->category);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function import_endpoint_accepts_legacy_payload_without_category_field(): void
+    {
+        // A JSON file exported by a pre-categories version of the extension
+        // has no `category` key on any row. It must still import cleanly,
+        // with every emoji landing in the default (null) category.
+        $response = $this->send($this->request('POST', '/api/flamojis/import', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => [
+                ['title' => 'Legacy One', 'text_to_replace' => ':legacy1:', 'path' => '/legacy1.png'],
+                ['title' => 'Legacy Two', 'text_to_replace' => ':legacy2:', 'path' => '/legacy2.png'],
+            ]],
+        ]));
+
+        $this->assertEquals(204, $response->getStatusCode());
+        $this->assertNull(Emoji::where('text_to_replace', ':legacy1:')->first()->category);
+        $this->assertNull(Emoji::where('text_to_replace', ':legacy2:')->first()->category);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

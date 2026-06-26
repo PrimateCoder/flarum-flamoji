@@ -241,16 +241,24 @@ export async function listCustomEmojiShortcodes(page) {
 
 // Open the "Add Emoji" modal, fill it, click Save, and wait for the
 // list to gain our new row. `path` accepts any URL or data URI — the
-// admin UI doesn't validate it.
+// admin UI doesn't validate it. `category` is optional (freeform).
 //
 // Note: the modal re-renders on every keystroke (the modal title binds
 // to the live emojiTitle stream), so previously-resolved input handles
 // can become detached. Re-query before each fill to be safe.
-export async function addCustomEmoji(page, { title, shortcode, path }) {
+//
+// Field order follows the EditEmojiModal ItemList priorities:
+//   0 = title (50), 1 = shortcode (40), 2 = category (35), 3 = path (30).
+export async function addCustomEmoji(page, { title, shortcode, path, category }) {
   await page.click('.customEmoji-addButton');
   await page.waitForSelector('.EditEmojiModal', { timeout: 10_000 });
 
-  for (const [idx, value] of [[0, title], [1, shortcode], [2, path]]) {
+  for (const [idx, value] of [
+    [0, title],
+    [1, shortcode],
+    [2, category ?? ''],
+    [3, path],
+  ]) {
     const input = await page.evaluateHandle((i) => {
       return document.querySelectorAll('.EditEmojiModal .FormControl')[i];
     }, idx);

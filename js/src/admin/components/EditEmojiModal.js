@@ -26,6 +26,7 @@ export default class EditEmojiModal extends FormModal {
 
     this.emojiTitle = Stream(this.emoji.title() || '');
     this.textToReplace = Stream(this.emoji.textToReplace() || '');
+    this.category = Stream(this.emoji.category() || '');
     this.path = Stream(this.emoji.path() || '');
   }
 
@@ -75,6 +76,27 @@ export default class EditEmojiModal extends FormModal {
     );
 
     items.add(
+      'category',
+      <div className="Form-group">
+        <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.category_label')}</label>
+        <input
+          className="FormControl"
+          list="flamoji-category-suggestions"
+          maxlength="255"
+          placeholder={app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.category_placeholder', {}, true)}
+          bidi={this.category}
+        />
+        <datalist id="flamoji-category-suggestions">
+          {this.existingCategories().map((c) => (
+            <option value={c} />
+          ))}
+        </datalist>
+        <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.category_text')}</div>
+      </div>,
+      35
+    );
+
+    items.add(
       'path',
       <div className="Form-group">
         <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.path_or_url_label')}</label>
@@ -112,8 +134,23 @@ export default class EditEmojiModal extends FormModal {
     return {
       title: this.emojiTitle(),
       text_to_replace: this.textToReplace(),
+      category: this.category().trim() || null,
       path: this.path(),
     };
+  }
+
+  /**
+   * Distinct, sorted list of category names already in use, sourced from
+   * the emoji records loaded in the store. Drives the <datalist> so admins
+   * reuse existing spellings instead of accidentally creating near-dupes.
+   */
+  existingCategories() {
+    const seen = new Set();
+    app.store.all('flamojis').forEach((emoji) => {
+      const c = (emoji.category() || '').trim();
+      if (c) seen.add(c);
+    });
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
   }
 
   onsubmit(e) {

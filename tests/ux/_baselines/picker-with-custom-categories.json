@@ -1,0 +1,22 @@
+{
+  "visible": true,
+  "hasSearchInput": true,
+  "hasPreview": true,
+  "hasSkinToneButton": true,
+  "navLabels": [
+    "Frequently Used",
+    "Smileys & People",
+    "Animals & Nature",
+    "Food & Drink",
+    "Activities",
+    "Travel & Places",
+    "Objects",
+    "Symbols",
+    "Flags",
+    "Memes",
+    "Reactions",
+    "Custom"
+  ],
+  "navCount": 12,
+  "firstTileHasSpriteBackground": true
+}

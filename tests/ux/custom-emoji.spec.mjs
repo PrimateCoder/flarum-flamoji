@@ -38,6 +38,14 @@ const FIXTURE_SHORTCODE = ':flamoji_ux_fixture:';
 const FIXTURE_PATH =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
+// Second fixture, assigned a freeform category. Used to prove that a
+// categorized custom emoji gets its OWN nav tab in the picker (emoji-mart
+// drops 2nd+ custom categories from the nav unless each carries an
+// explicit `icon`, which buildPicker now sets to the first emoji's image).
+const CAT_FIXTURE_TITLE = 'Flamoji UX Cat Fixture';
+const CAT_FIXTURE_SHORTCODE = ':flamoji_ux_cat_fixture:';
+const CAT_FIXTURE_CATEGORY = 'Flamoji UX Memes';
+
 // ---------- forum-side helpers (shared shape with picker-features) ----------
 
 async function openPicker(page) {
@@ -185,25 +193,25 @@ await runSpec({
     `before=${pickerBaseline.customTileCount} after=${afterCreate.customTileCount}`
   );
 
-  // === 3. SEARCH by a name token. emoji-mart's SearchIndex pre-builds
-  // a token pool from the custom emoji's `name` and `keywords`; in
-  // practice "flamoji" reliably matches our fixture (other emoji on
-  // this forum don't carry that token), while shorter generic words
-  // like "fixture" can be missed by the index. Pick a token that's
-  // distinctive AND in the name so the assertion is robust. ===
   // === 3. SEARCH by a name token. emoji-mart's SearchIndex is built
-  // once when the picker first opens, so we need a fresh page (new
-  // tab) to get a picker instance that includes the newly created
-  // emoji in its search index. ===
+  // once when the picker first opens, so we use a fresh page (new tab) to
+  // get a picker instance whose index includes the newly created emoji.
+  //
+  // Search for "fixture": a token unique to this fixture's title
+  // ("Flamoji UX Fixture"). Note we deliberately do NOT search "flamoji"
+  // here — every custom emoji's emoji-mart id is prefixed "flamoji-"
+  // (see buildPicker), and emoji-mart indexes the id, so "flamoji" matches
+  // every custom emoji on the forum (e.g. a path-based :pianotell:) and the
+  // id-based localeCompare tie-break can rank another emoji first. ===
   console.log('\n[scenario] picker search by name token');
   const page2 = await page.context().newPage();
   await page2.goto(BASE, { waitUntil: 'networkidle' });
   await openComposer(page2);
   await openPicker(page2);
-  await setSearch(page2, 'flamoji');
+  await setSearch(page2, 'fixture');
   const resultsByTitle = await searchResultCount(page2);
   check(
-    'searching the picker for "flamoji" returns at least one tile',
+    'searching the picker for "fixture" returns at least one tile',
     resultsByTitle >= 1,
     `count=${resultsByTitle}`
   );
@@ -221,6 +229,43 @@ await runSpec({
     `before="${beforeText}" after="${afterText}"`
   );
   await page2.close();
+
+  // === 4b. CATEGORY: a custom emoji assigned a freeform category gets
+  // its own dedicated picker nav tab (labeled with the category name),
+  // alongside the default Custom tab. This proves the per-category `icon`
+  // fix: without it, emoji-mart marks every custom category after the
+  // first as a `target` and drops it from the nav bar entirely. ===
+  console.log('\n[scenario] categorized custom emoji gets its own picker tab');
+  await gotoAdmin(page, BASE);
+  await deleteCustomEmojiByShortcode(page, CAT_FIXTURE_SHORTCODE).catch(() => {});
+  await addCustomEmoji(page, {
+    title: CAT_FIXTURE_TITLE,
+    shortcode: CAT_FIXTURE_SHORTCODE,
+    path: FIXTURE_PATH,
+    category: CAT_FIXTURE_CATEGORY,
+  });
+
+  const page3 = await page.context().newPage();
+  await page3.goto(BASE, { waitUntil: 'networkidle' });
+  await openComposer(page3);
+  await openPicker(page3);
+  const catSnap = await pickerSnapshot(page3);
+  console.log(`  → picker nav labels: ${JSON.stringify(catSnap.navLabels)}`);
+  check(
+    'categorized emoji adds a dedicated nav tab labeled with its category',
+    catSnap.navLabels.includes(CAT_FIXTURE_CATEGORY),
+    `nav=${JSON.stringify(catSnap.navLabels)}`
+  );
+  check(
+    'the default Custom tab coexists with the named category tab',
+    catSnap.navLabels.some((l) => /custom/i.test(l)),
+    `nav=${JSON.stringify(catSnap.navLabels)}`
+  );
+  await page3.close();
+
+  // Clean up the categorized fixture so the forum returns to baseline.
+  await gotoAdmin(page, BASE);
+  await deleteCustomEmojiByShortcode(page, CAT_FIXTURE_SHORTCODE).catch(() => {});
 
   // === 5. DELETE via admin pencil → modal Delete button ===
   console.log('\n[scenario] delete custom emoji via admin UI');

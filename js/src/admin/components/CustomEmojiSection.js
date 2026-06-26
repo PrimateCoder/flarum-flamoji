@@ -30,6 +30,7 @@ export default class CustomEmojiSection extends Component {
         customEmojiList[i] = {
           title: emoji.title,
           text_to_replace: emoji.text_to_replace,
+          category: emoji.category,
           path: emoji.path,
         };
       });

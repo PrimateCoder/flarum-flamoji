@@ -33,7 +33,7 @@ class EmojiRules
      * @param  array<string, mixed>  $attributes
      * @param  string  $errorKeyPrefix  optional, used by bulk import to
      *                                  point the error at the failing row
-     * @return array{title: string, text_to_replace: string, path: string}
+     * @return array{title: string, text_to_replace: string, path: string, category: ?string}
      *
      * @throws ValidationException
      */
@@ -42,6 +42,7 @@ class EmojiRules
         $title = trim((string) ($attributes['title'] ?? ''));
         $textToReplace = trim((string) ($attributes['text_to_replace'] ?? $attributes['textToReplace'] ?? ''));
         $path = trim((string) ($attributes['path'] ?? ''));
+        $category = trim((string) ($attributes['category'] ?? ''));
 
         $errors = [];
         if (($err = self::validateTextToReplace($textToReplace, true)) !== null) {
@@ -49,6 +50,9 @@ class EmojiRules
         }
         if (($err = self::validatePath($path, true)) !== null) {
             $errors[$errorKeyPrefix . 'path'] = $err;
+        }
+        if (($err = self::validateCategory($category)) !== null) {
+            $errors[$errorKeyPrefix . 'category'] = $err;
         }
         if (! empty($errors)) {
             throw new ValidationException($errors);
@@ -58,6 +62,7 @@ class EmojiRules
             'title' => $title,
             'text_to_replace' => $textToReplace,
             'path' => $path,
+            'category' => $category !== '' ? $category : null,
         ];
     }
 
@@ -83,6 +88,19 @@ class EmojiRules
         }
         // Empty string in update context means "not changing" — caller
         // should branch on array_key_exists before invoking us.
+        return null;
+    }
+
+    /**
+     * Category is optional and freeform. The only constraint is length:
+     * it is persisted in a VARCHAR(255) column, so reject anything longer
+     * to surface a 422 instead of a DB-level error / silent truncation.
+     */
+    public static function validateCategory(string $value): ?string
+    {
+        if (mb_strlen($value) > 255) {
+            return 'The category must not be longer than 255 characters.';
+        }
         return null;
     }
 }

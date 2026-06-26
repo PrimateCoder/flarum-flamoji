@@ -436,14 +436,40 @@ app.initializers.add(
       // text without round-tripping through paths or URLs.
       const customEmojiReplacers = {};
       const customEmojis = [];
-      const customEntries = [];
+
+      // emoji-mart's `custom` prop is an array of categories, each rendered
+      // as its own nav tab (first emoji becomes the tab icon). Group the
+      // flat emoji list by the freeform `category` string. Emoji with no
+      // category fall into the default "Custom" tab. Keyed by the derived
+      // emoji-mart category id so distinct strings that slugify to the same
+      // id (e.g. "My Cats" vs "my-cats") merge into one tab instead of
+      // colliding — first-seen display name wins.
+      const DEFAULT_CUSTOM_ID = 'flamoji_custom';
+      const customGroups = new Map();
+
+      const slugify = (name) => {
+        const base = name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '');
+        // Non-Latin or punctuation-only names (e.g. "猫", "🙂", "!!!") strip
+        // to empty. Fall back to a stable ASCII id derived from the string's
+        // code points so each distinct name still gets its own tab instead
+        // of silently merging into the default Custom group.
+        if (base) return base;
+        return Array.from(name)
+          .map((ch) => ch.codePointAt(0).toString(36))
+          .join('');
+      };
 
       response.forEach((customEmoji) => {
         const path = customEmoji['path'];
         const title = customEmoji['title'];
         const replacer = customEmoji['text_to_replace'];
+        const category = (customEmoji['category'] || '').trim();
         // Use the path as a stable id; paths are unique in the custom-emoji table.
         const id = 'flamoji-' + path;
+        const src = urlChecker(path) ? path : baseUrl + path;
 
         // emoji-mart's SearchIndex tokenizes name + each keyword and does
         // prefix matching per token. Build a comprehensive keyword set
@@ -452,10 +478,10 @@ app.initializers.add(
         // (space, dash, underscore) or surrounding colons.
         const stripped = replacer.replace(/^:|:$/g, '');
         const keywords = new Set();
-        [title, stripped].forEach((src) => {
-          if (!src) return;
-          keywords.add(src.toLowerCase());
-          src
+        [title, stripped].forEach((kwSrc) => {
+          if (!kwSrc) return;
+          keywords.add(kwSrc.toLowerCase());
+          kwSrc
             .toLowerCase()
             .split(/[\s\-_]+/)
             .filter(Boolean)
@@ -463,28 +489,54 @@ app.initializers.add(
         });
 
         customEmojiReplacers[id] = replacer;
-        customEntries.push({
+
+        const slug = category ? slugify(category) : '';
+        const groupId = slug ? 'flamoji_custom_' + slug : DEFAULT_CUSTOM_ID;
+        if (!customGroups.has(groupId)) {
+          customGroups.set(groupId, {
+            id: groupId,
+            name: slug ? category : app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.custom', {}, true),
+            // emoji-mart sets `target` on every custom category after the
+            // first that lacks an `icon`, which removes it from the nav bar
+            // (see emoji-mart init: `if (prevCategory && !category.icon)
+            // category.target = ...`). Give each group an explicit icon —
+            // its first emoji's image — so every category renders as its own
+            // selectable tab with a distinguishable icon, instead of the
+            // identical generic "custom" glyph emoji-mart would otherwise use.
+            icon: { src },
+            emojis: [],
+          });
+        }
+        customGroups.get(groupId).emojis.push({
           id,
           name: title,
           keywords: Array.from(keywords),
-          skins: [{ src: urlChecker(path) ? path : baseUrl + path }],
+          skins: [{ src }],
         });
       });
 
-      if (customEntries.length) {
-        customEmojis.push({
-          id: 'flamoji_custom',
-          name: app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.custom', {}, true),
-          emojis: customEntries,
+      if (customGroups.size) {
+        // Order tabs deterministically: named categories alphabetically,
+        // with the uncategorized "Custom" group last. Without this the
+        // order would follow emoji insertion order (id desc), which is
+        // arbitrary from the admin's perspective.
+        const groups = Array.from(customGroups.values()).sort((a, b) => {
+          if (a.id === DEFAULT_CUSTOM_ID) return 1;
+          if (b.id === DEFAULT_CUSTOM_ID) return -1;
+          return a.name.localeCompare(b.name);
         });
 
-        // emoji-mart's `categories` prop is an explicit allow-list. If we
-        // pass `custom` items but don't include their category id here,
-        // the picker silently hides the entire Custom tab. Append the
-        // custom group's id to the allow-list so it shows up at the end.
-        if (specifiedCategories.indexOf('flamoji_custom') === -1) {
-          specifiedCategories.push('flamoji_custom');
-        }
+        groups.forEach((group) => {
+          customEmojis.push(group);
+
+          // emoji-mart's `categories` prop is an explicit allow-list. If we
+          // pass `custom` items but don't include their category id here,
+          // the picker silently hides the entire tab. Append each custom
+          // group's id so it shows up after the built-in categories.
+          if (specifiedCategories.indexOf(group.id) === -1) {
+            specifiedCategories.push(group.id);
+          }
+        });
       }
 
       const autoHide = !!app.forum.attribute('flamoji.auto_hide');

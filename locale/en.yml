@@ -55,6 +55,9 @@ pianotell-flamoji:
         emoji_title_label: Emoji Title
         delete_emoji_confirmation: "Are you sure you want to delete this emoji?"
         text_to_replace_label: Text to Replace
+        category_label: Category
+        category_placeholder: e.g. Memes
+        category_text: "Optional. Custom emojis sharing the same category appear together in their own picker tab. Leave blank for the default Custom tab."
         path_or_url_label: Path or URL
         submit_button: => core.ref.save_changes
         delete_emoji_button: Delete emoji

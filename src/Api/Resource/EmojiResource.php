@@ -99,6 +99,10 @@ class EmojiResource extends AbstractDatabaseResource
                 ->writable()
                 ->requiredOnCreate(),
 
+            Schema\Str::make('category')
+                ->writable()
+                ->nullable(),
+
             Schema\Str::make('path')
                 ->writable()
                 ->requiredOnCreate(),
@@ -119,6 +123,17 @@ class EmojiResource extends AbstractDatabaseResource
     {
         if ($model->isDirty('title')) {
             $model->title = trim((string) $model->title);
+        }
+
+        if ($model->isDirty('category')) {
+            $category = trim((string) $model->category);
+
+            $err = EmojiRules::validateCategory($category);
+            if ($err !== null) {
+                throw new ValidationException(['category' => $err]);
+            }
+
+            $model->category = $category !== '' ? $category : null;
         }
 
         if ($model->isDirty('text_to_replace')) {
@@ -198,7 +213,8 @@ class EmojiResource extends AbstractDatabaseResource
                 $emoji = Emoji::build(
                     $row['title'],
                     $row['text_to_replace'],
-                    $row['path']
+                    $row['path'],
+                    $row['category'] ?? null
                 );
                 $emoji->save();
             }
