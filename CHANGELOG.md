@@ -1,3 +1,8 @@
+### 2.2.1 — 2026-06-25
+
+- **Shortcode convention enforcement** — the emoji trigger field is now labelled **Shortcode** and validates the recommended `:word:` format (wrapped in colons; letters, numbers, `_`, `+`, `-` only) when you add an emoji or change an existing one's shortcode. This prevents bare-word triggers (e.g. `png`) that the formatter would otherwise match anywhere in a post. Existing shortcodes are grandfathered: editing a legacy emoji's other fields won't force you to fix its trigger.
+- **Backwards-compatible import** — JSON import still accepts legacy (non-canonical) shortcodes so older exports keep working; it now surfaces a non-blocking notice listing any imported shortcodes that don't follow the convention.
+
 ### 2.2.0 — 2026-06-25
 
 - **Custom emoji categories** — custom emojis can now be organized into named tabs in the picker. Assign each emoji a freeform **Category** in the admin panel; emojis sharing a category appear together under their own picker tab, with the category's first emoji as the tab icon. Emojis left without a category stay in the default Custom tab. Categories are included in JSON import/export.
