@@ -260,6 +260,10 @@ const VARIANTS = [
       check('sticker-mode — picker restricted to custom categories',
         snap.navLabels.length > 0 && !snap.navLabels.some((l) => BUILTINS.test(l)),
         `nav=${JSON.stringify(snap.navLabels)}`);
+      // Custom emoji have no skin-tone variants, so the skin-tone selector is
+      // suppressed in sticker mode even though show_variants is on (default).
+      check('sticker-mode — no skin-tone selector (custom emoji have no variants)',
+        !snap.hasSkinToneButton);
     },
   },
 ];

@@ -216,6 +216,39 @@ await runSpec({
     `count=${resultsByTitle}`
   );
 
+  // === 3b. PREVIEW shows the configured shortcode, not the image path ===
+  // emoji-mart renders `:<emoji id>:` as the preview subtitle. buildPicker
+  // sets the custom emoji id to the configured shortcode (sans colons), so
+  // hovering the fixture must preview `:flamoji_ux_fixture:` — NOT
+  // `:flamoji-https://…:`, the old bug where the id was the image path.
+  console.log('\n[scenario] preview shows the configured shortcode');
+  const tileCenter = await page2.evaluate(() => {
+    const sr = document.querySelector('em-emoji-picker.flamoji-picker-popup').shadowRoot;
+    const cat = [...sr.querySelectorAll('.category')].find((c) =>
+      /search/i.test(c.querySelector('.sticky')?.textContent || '')
+    );
+    const tile = cat && cat.querySelector('button');
+    if (!tile) return null;
+    const r = tile.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+  if (tileCenter) {
+    // A real pointer move triggers emoji-mart's onMouseEnter → preview update
+    // (synthetic events don't reliably populate the preview state).
+    await page2.mouse.move(tileCenter.x, tileCenter.y);
+    await page2.waitForTimeout(500);
+  }
+  const previewSubtitle = await page2.evaluate(() => {
+    const sr = document.querySelector('em-emoji-picker.flamoji-picker-popup').shadowRoot;
+    const s = sr.querySelector('.preview-subtitle');
+    return s ? s.textContent.trim() : '(none)';
+  });
+  check(
+    'picker preview shows the configured shortcode, not the image path',
+    previewSubtitle === FIXTURE_SHORTCODE,
+    `subtitle="${previewSubtitle}"`
+  );
+
   // === 4. SEARCH + INSERT inserts the configured shortcode ===
   console.log('\n[scenario] click first search hit → composer gains shortcode');
   const beforeText = await composerText(page2);

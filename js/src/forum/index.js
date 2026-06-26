@@ -463,45 +463,35 @@ app.initializers.add(
       const customEmojis = [];
 
       // emoji-mart's `custom` prop is an array of categories, each rendered
-      // as its own nav tab (first emoji becomes the tab icon). Group the
-      // flat emoji list by the freeform `category` string. Emoji with no
-      // category fall into the default "Custom" tab. Keyed by the derived
-      // emoji-mart category id so distinct strings that slugify to the same
-      // id (e.g. "My Cats" vs "my-cats") merge into one tab instead of
-      // colliding — first-seen display name wins.
-      const DEFAULT_CUSTOM_ID = 'flamoji_custom';
-      const customGroups = new Map();
-
-      const slugify = (name) => {
-        const base = name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '_')
-          .replace(/^_+|_+$/g, '');
-        // Non-Latin or punctuation-only names (e.g. "猫", "🙂", "!!!") strip
-        // to empty. Fall back to a stable ASCII id derived from the string's
-        // code points so each distinct name still gets its own tab instead
-        // of silently merging into the default Custom group.
-        if (base) return base;
-        return Array.from(name)
-          .map((ch) => ch.codePointAt(0).toString(36))
-          .join('');
-      };
+      // as its own nav tab. Group the flat custom-emoji list by its freeform
+      // `category` name (whitespace-trimmed, exact match); emoji with no
+      // category fall into the default "Custom" group. Opaque ids are
+      // assigned after sorting (see below) so the freeform category text is
+      // never turned into a DOM/category id.
+      const CUSTOM_LABEL = app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.custom', {}, true);
+      const customGroups = new Map(); // trimmed category name ('' = uncategorized) -> group
 
       response.forEach((customEmoji) => {
         const path = customEmoji['path'];
         const title = customEmoji['title'];
         const replacer = customEmoji['text_to_replace'];
         const category = (customEmoji['category'] || '').trim();
-        // Use the path as a stable id; paths are unique in the custom-emoji table.
-        const id = 'flamoji-' + path;
         const src = urlChecker(path) ? path : baseUrl + path;
+
+        // emoji-mart uses an emoji's `id` as its shortcode and renders
+        // `:<id>:` as the preview subtitle, so use the configured shortcode
+        // (sans the surrounding colons) as the id. text_to_replace is unique
+        // — enforced server-side and required by the text formatter — so
+        // these ids are unique too. (Fall back to a path-based id for the
+        // degenerate case of a colons-only shortcode that strips to nothing.)
+        const stripped = replacer.replace(/^:|:$/g, '');
+        const id = stripped || 'flamoji-' + path;
 
         // emoji-mart's SearchIndex tokenizes name + each keyword and does
         // prefix matching per token. Build a comprehensive keyword set
         // from both the title and the shortcode so users can find the
         // emoji by typing any word in either, regardless of separator
         // (space, dash, underscore) or surrounding colons.
-        const stripped = replacer.replace(/^:|:$/g, '');
         const keywords = new Set();
         [title, stripped].forEach((kwSrc) => {
           if (!kwSrc) return;
@@ -515,24 +505,18 @@ app.initializers.add(
 
         customEmojiReplacers[id] = replacer;
 
-        const slug = category ? slugify(category) : '';
-        const groupId = slug ? 'flamoji_custom_' + slug : DEFAULT_CUSTOM_ID;
-        if (!customGroups.has(groupId)) {
-          customGroups.set(groupId, {
-            id: groupId,
-            name: slug ? category : app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.custom', {}, true),
-            // emoji-mart sets `target` on every custom category after the
-            // first that lacks an `icon`, which removes it from the nav bar
-            // (see emoji-mart init: `if (prevCategory && !category.icon)
-            // category.target = ...`). Give each group an explicit icon —
-            // its first emoji's image — so every category renders as its own
-            // selectable tab with a distinguishable icon, instead of the
-            // identical generic "custom" glyph emoji-mart would otherwise use.
+        if (!customGroups.has(category)) {
+          customGroups.set(category, {
+            name: category || CUSTOM_LABEL,
+            // emoji-mart marks every custom category after the first that
+            // lacks an `icon` as a `target` and drops it from the nav bar.
+            // Give each group its first emoji's image as the icon so every
+            // category renders as its own selectable, distinguishable tab.
             icon: { src },
             emojis: [],
           });
         }
-        customGroups.get(groupId).emojis.push({
+        customGroups.get(category).emojis.push({
           id,
           name: title,
           keywords: Array.from(keywords),
@@ -542,25 +526,27 @@ app.initializers.add(
 
       if (customGroups.size) {
         // Order tabs deterministically: named categories alphabetically,
-        // with the uncategorized "Custom" group last. Without this the
-        // order would follow emoji insertion order (id desc), which is
-        // arbitrary from the admin's perspective.
-        const groups = Array.from(customGroups.values()).sort((a, b) => {
-          if (a.id === DEFAULT_CUSTOM_ID) return 1;
-          if (b.id === DEFAULT_CUSTOM_ID) return -1;
-          return a.name.localeCompare(b.name);
+        // with the uncategorized "Custom" group last (insertion order would
+        // otherwise be arbitrary from the admin's perspective).
+        const groups = Array.from(customGroups.entries()).sort(([a], [b]) => {
+          if (a === '') return 1;
+          if (b === '') return -1;
+          return a.localeCompare(b);
         });
 
-        groups.forEach((group) => {
+        groups.forEach(([name, group], i) => {
+          // Assign an opaque id here rather than deriving one from the
+          // freeform category text: the uncategorized group keeps the bare
+          // id, named groups get an index suffix. All share the
+          // `flamoji_custom` prefix that the sticker-mode filter relies on,
+          // and none can collide with a built-in emoji-mart category id.
+          group.id = name === '' ? 'flamoji_custom' : 'flamoji_custom_' + i;
           customEmojis.push(group);
 
-          // emoji-mart's `categories` prop is an explicit allow-list. If we
-          // pass `custom` items but don't include their category id here,
-          // the picker silently hides the entire tab. Append each custom
-          // group's id so it shows up after the built-in categories.
-          if (specifiedCategories.indexOf(group.id) === -1) {
-            specifiedCategories.push(group.id);
-          }
+          // emoji-mart's `categories` prop is an explicit allow-list; a
+          // custom group whose id isn't listed is silently hidden. These
+          // ids are freshly generated, so just append them.
+          specifiedCategories.push(group.id);
         });
       }
 
@@ -572,6 +558,11 @@ app.initializers.add(
       const showVariants = !!app.forum.attribute('flamoji.show_variants');
       const showCategoryButtons = !!app.forum.attribute('flamoji.show_category_buttons');
       const stickerMode = !!app.forum.attribute('flamoji.sticker_mode');
+      // Sticker mode only enlarges custom emoji, so on a forum with no custom
+      // emoji it would just leave a sticker-sized grid of normal unicode
+      // emoji. Gate the entire behaviour (category filter, enlarged grid,
+      // responsive popup) on having at least one custom group.
+      const effectiveStickerMode = stickerMode && customGroups.size > 0;
 
       // emoji-mart's `categories` prop is an explicit allow-list. When
       // showRecents is enabled, we still need 'frequent' on the list or
@@ -586,10 +577,8 @@ app.initializers.add(
       // default size, since those render as fonts/sprites, not <img>). So
       // when it's on, restrict the picker to the custom categories only —
       // the built-in unicode tabs and Frequent would otherwise sit at normal
-      // size amongst the stickers and just add noise. Guard on customGroups
-      // so a forum with no custom emoji still gets the normal picker rather
-      // than an empty one.
-      if (stickerMode && customGroups.size) {
+      // size amongst the stickers and just add noise.
+      if (effectiveStickerMode) {
         specifiedCategories = specifiedCategories.filter((id) => id.indexOf('flamoji_custom') === 0);
       }
 
@@ -631,10 +620,13 @@ app.initializers.add(
         // a WebKit sub-pixel IntersectionObserver bug in emoji-mart's NavBar
         // that mis-highlights a category on click — acceptable for the
         // opt-in sticker mode.
-        ...(stickerMode ? STICKER_GRID : {}),
+        ...(effectiveStickerMode ? STICKER_GRID : {}),
         previewPosition: showPreview ? 'bottom' : 'none',
         searchPosition: showSearch ? 'sticky' : 'none',
-        skinTonePosition: showVariants ? 'preview' : 'none',
+        // Custom emoji have a single image (no skin-tone variants), so the
+        // skin-tone selector is non-functional in sticker mode (which shows
+        // only custom emoji). Suppress it there regardless of the setting.
+        skinTonePosition: showVariants && !effectiveStickerMode ? 'preview' : 'none',
         navPosition: showCategoryButtons ? 'top' : 'none',
         maxFrequentRows: showRecents ? parseInt(app.forum.attribute('flamoji.frequent_rows'), 10) || 4 : 0,
         onEmojiSelect: (emoji) => {
@@ -675,7 +667,7 @@ app.initializers.add(
       // In sticker mode the popup gets a responsive CSS width/height (see
       // less/forum.less); emoji-mart's dynamicWidth then computes perLine
       // from that width.
-      if (stickerMode) picker.classList.add('flamoji-picker-popup--sticker');
+      if (effectiveStickerMode) picker.classList.add('flamoji-picker-popup--sticker');
       picker.setAttribute('role', 'dialog');
       picker.setAttribute('aria-label', app.translator.trans(t + 'composer.emoji_picker_label', {}, true));
       // Tear down the loading placeholder right before the real picker is

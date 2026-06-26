@@ -49,6 +49,9 @@ export default class EditEmojiModal extends FormModal {
   content() {
     return (
       <div className="Modal-body">
+        <p className="helpText" style="margin-bottom: 15px;">
+          {app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.intro_text')}
+        </p>
         <Form>{this.fields().toArray()}</Form>
       </div>
     );
@@ -62,6 +65,7 @@ export default class EditEmojiModal extends FormModal {
       <div className="Form-group">
         <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.emoji_title_label')}</label>
         <input className="FormControl" bidi={this.emojiTitle} />
+        <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.emoji_title_text')}</div>
       </div>,
       50
     );
@@ -70,7 +74,8 @@ export default class EditEmojiModal extends FormModal {
       'textToReplace',
       <div className="Form-group">
         <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.text_to_replace_label')}</label>
-        <input className="FormControl" bidi={this.textToReplace} />
+        <input className="FormControl" placeholder=":flamoji_partyparrot:" bidi={this.textToReplace} />
+        <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.text_to_replace_text')}</div>
       </div>,
       40
     );
@@ -101,6 +106,7 @@ export default class EditEmojiModal extends FormModal {
       <div className="Form-group">
         <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.path_or_url_label')}</label>
         <input className="FormControl" placeholder="/assets/emojis/batman.png" bidi={this.path} />
+        <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.path_or_url_text')}</div>
       </div>,
       30
     );
