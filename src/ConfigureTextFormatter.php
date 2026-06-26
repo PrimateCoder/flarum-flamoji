@@ -34,15 +34,22 @@ class ConfigureTextFormatter
         $customEmojis = Emoji::all();
 
         foreach ($customEmojis as $emoji) {
-            if (empty($emoji->text_to_replace)) {
+            // Skip rows missing the trigger or the image path. The DB column
+            // for text_to_replace is nullable and path can be blank if a row
+            // was inserted outside the API (the API requires both), so guard
+            // defensively — otherwise we'd register an empty trigger or emit
+            // an <img> with an empty/base-only src on every matching post.
+            if (empty($emoji->text_to_replace) || empty($emoji->path)) {
                 continue;
             }
 
             $path = $emoji->path;
 
-            // check if the path starts with http:// or https://
-            // We're using a similar thing on the urlChecker.js
-            if (!preg_match('/http(s?)\:\/\//i', $path)) {
+            // Treat the path as absolute only when it actually starts with
+            // http(s)://. Anchored to match urlChecker.js (^(http|https)://)
+            // so the picker and post rendering agree; otherwise it's a
+            // forum-relative path and we prepend the base URL.
+            if (!preg_match('/^https?:\/\//i', $path)) {
                 $path = $this->url->to('forum')->base() . $path;
             }
 

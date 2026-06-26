@@ -165,6 +165,77 @@ class EmojisApiTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function create_endpoint_rejects_duplicate_trigger(): void
+    {
+        // :wave: is already seeded (id 1). Creating another emoji with the
+        // same trigger must be rejected by the saving() uniqueness check.
+        $response = $this->send($this->request('POST', '/api/flamojis', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => [
+                'title' => 'Dupe',
+                'text_to_replace' => ':wave:',
+                'path' => '/dupe.png',
+            ]]],
+        ]));
+
+        $this->assertEquals(422, $response->getStatusCode());
+        // Only the original :wave: remains; no second row was created.
+        $this->assertSame(1, Emoji::where('text_to_replace', ':wave:')->count());
+        $this->assertFalse(Emoji::where('title', 'Dupe')->exists());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function create_endpoint_rejects_duplicate_trigger_after_trimming(): void
+    {
+        // The trigger is trimmed before the uniqueness check, so a padded
+        // duplicate (" :wave: ") must collide with the existing :wave:.
+        $response = $this->send($this->request('POST', '/api/flamojis', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => [
+                'title' => 'Padded dupe',
+                'text_to_replace' => '  :wave:  ',
+                'path' => '/dupe.png',
+            ]]],
+        ]));
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertSame(1, Emoji::where('text_to_replace', ':wave:')->count());
+        $this->assertFalse(Emoji::where('title', 'Padded dupe')->exists());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function update_endpoint_rejects_duplicate_trigger(): void
+    {
+        // Changing :smile: (id 2) to :wave: (id 1's trigger) must be rejected
+        // and leave the row unchanged.
+        $response = $this->send($this->request('PATCH', '/api/flamojis/2', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => ['text_to_replace' => ':wave:']]],
+        ]));
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertSame(':smile:', Emoji::find(2)->text_to_replace);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function update_endpoint_allows_saving_emoji_with_its_own_unchanged_trigger(): void
+    {
+        // Re-saving an emoji without changing its trigger must NOT trip the
+        // uniqueness check against itself.
+        $response = $this->send($this->request('PATCH', '/api/flamojis/1', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => [
+                'title' => 'Wave Renamed',
+                'text_to_replace' => ':wave:',
+            ]]],
+        ]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertSame('Wave Renamed', Emoji::find(1)->title);
+        $this->assertSame(':wave:', Emoji::find(1)->text_to_replace);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function update_endpoint_modifies_emoji_for_admin(): void
     {
         $response = $this->send($this->request('PATCH', '/api/flamojis/1', [
