@@ -10,6 +10,10 @@ Screenshot:
 
 ![Picker](https://raw.githubusercontent.com/PrimateCoder/flarum-flamoji/main/docs/screenshots/picker.png)
 
+Sticker mode — custom emojis organized into categories and rendered large in posts:
+
+![Sticker mode](https://raw.githubusercontent.com/PrimateCoder/flarum-flamoji/main/docs/screenshots/sticker-mode.png)
+
 ## Features
 
 - Built on [emoji-mart](https://github.com/missive/emoji-mart) (Missive, MIT). Originally based on [joeattardi/emoji-button](https://github.com/joeattardi/emoji-button) — migrated in this fork after the upstream picker was archived.
