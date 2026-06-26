@@ -17,7 +17,7 @@ use Flarum\Api\Sort\SortColumn;
 use Flarum\Foundation\ValidationException;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Arr;
-use Laminas\Diactoros\Response\EmptyResponse;
+use Laminas\Diactoros\Response\JsonResponse;
 use PianoTell\Flamoji\Validation\EmojiRules;
 use PianoTell\Flamoji\Models\Emoji;
 use Tobyz\JsonApiServer\Context as BaseContext;
@@ -80,11 +80,12 @@ class EmojiResource extends AbstractDatabaseResource
                 ->admin()
                 ->action(function (Context $context) {
                     $data = Arr::get($context->body(), 'data', []);
-                    $this->handleImport($data);
 
-                    return null;
+                    return $this->handleImport($data);
                 })
-                ->response(fn (Context $context, mixed $data) => new EmptyResponse(204)),
+                ->response(fn (Context $context, mixed $data) => new JsonResponse([
+                    'legacyShortcodes' => $data,
+                ], 200)),
         ];
     }
 
@@ -145,12 +146,22 @@ class EmojiResource extends AbstractDatabaseResource
                 throw new ValidationException(['text_to_replace' => $err]);
             }
 
+            // Enforce the canonical shortcode format for new or changed
+            // triggers. The isDirty() guard grandfathers existing rows:
+            // editing a legacy emoji's other fields leaves its trigger
+            // untouched (not dirty) and so skips this check; only creating
+            // or actually changing the trigger requires the new format.
+            $err = EmojiRules::validateCanonicalShortcode($value);
+            if ($err !== null) {
+                throw new ValidationException(['text_to_replace' => $err]);
+            }
+
             // Check for duplicate trigger text
             $existing = Emoji::where('text_to_replace', $value)
                 ->where('id', '!=', $model->id ?? 0)
                 ->first();
             if ($existing) {
-                throw new ValidationException(['text_to_replace' => 'This trigger text is already used by another emoji.']);
+                throw new ValidationException(['text_to_replace' => 'This shortcode is already used by another emoji.']);
             }
         }
 
@@ -170,18 +181,26 @@ class EmojiResource extends AbstractDatabaseResource
     /**
      * All-or-nothing bulk import. Validates every row before persisting
      * any, and wraps persistence in a DB transaction.
+     *
+     * @return list<string> the non-canonical ("legacy") shortcodes that were
+     *                      imported as-is, for a non-blocking admin notice
      */
-    private function handleImport(array $data): void
+    private function handleImport(array $data): array
     {
         $errors = [];
         $normalized = [];
         $seenTriggers = [];
+        $legacyShortcodes = [];
 
         // Pre-load existing triggers for duplicate detection
         $existingTriggers = Emoji::pluck('text_to_replace')->filter()->all();
 
         foreach ($data as $i => $emojiData) {
             try {
+                // Import is the backwards-compatibility surface: it validates
+                // only the legacy floor (non-empty, no whitespace, unique),
+                // NOT the canonical shortcode format, so JSON exported by an
+                // older version (or a legacy install) still imports cleanly.
                 $normalized[$i] = EmojiRules::validateCreate(
                     is_array($emojiData) ? $emojiData : [],
                     "data.$i."
@@ -191,13 +210,18 @@ class EmojiResource extends AbstractDatabaseResource
 
                 // Check for duplicate within the import batch
                 if (isset($seenTriggers[$trigger])) {
-                    $errors["data.$i.text_to_replace"] = "Duplicate trigger text within import batch (same as row {$seenTriggers[$trigger]}).";
+                    $errors["data.$i.text_to_replace"] = "Duplicate shortcode within import batch (same as row {$seenTriggers[$trigger]}).";
                 }
                 // Check against existing DB entries
                 elseif (in_array($trigger, $existingTriggers, true)) {
-                    $errors["data.$i.text_to_replace"] = 'This trigger text is already used by another emoji.';
+                    $errors["data.$i.text_to_replace"] = 'This shortcode is already used by another emoji.';
                 } else {
                     $seenTriggers[$trigger] = $i;
+                    // Track non-canonical triggers so the admin gets a
+                    // non-blocking heads-up (the import still succeeds).
+                    if (! EmojiRules::isCanonicalShortcode($trigger)) {
+                        $legacyShortcodes[] = $trigger;
+                    }
                 }
             } catch (ValidationException $e) {
                 $errors = array_merge($errors, $e->getAttributes());
@@ -219,5 +243,7 @@ class EmojiResource extends AbstractDatabaseResource
                 $emoji->save();
             }
         });
+
+        return $legacyShortcodes;
     }
 }

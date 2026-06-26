@@ -191,4 +191,37 @@ class EmojiRulesTest extends TestCase
         $this->assertNull(EmojiRules::validatePath('/assets/x.png', true));
         $this->assertNull(EmojiRules::validatePath('x.png', true));
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function is_canonical_shortcode_accepts_colon_wrapped_safe_chars(): void
+    {
+        $this->assertTrue(EmojiRules::isCanonicalShortcode(':wave:'));
+        $this->assertTrue(EmojiRules::isCanonicalShortcode(':flamoji_partyparrot:'));
+        $this->assertTrue(EmojiRules::isCanonicalShortcode(':a-b:'));
+        $this->assertTrue(EmojiRules::isCanonicalShortcode(':+1:'));
+        $this->assertTrue(EmojiRules::isCanonicalShortcode(':AB12:'));
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function is_canonical_shortcode_rejects_non_canonical_values(): void
+    {
+        // Bare word (the foot-gun the formatter would match as a substring).
+        $this->assertFalse(EmojiRules::isCanonicalShortcode('png'));
+        // Missing one colon.
+        $this->assertFalse(EmojiRules::isCanonicalShortcode(':wave'));
+        $this->assertFalse(EmojiRules::isCanonicalShortcode('wave:'));
+        // Empty inner.
+        $this->assertFalse(EmojiRules::isCanonicalShortcode('::'));
+        // Disallowed character.
+        $this->assertFalse(EmojiRules::isCanonicalShortcode(':wave!:'));
+        // Embedded colon / URL-ish.
+        $this->assertFalse(EmojiRules::isCanonicalShortcode(':https://x:'));
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function validate_canonical_shortcode_returns_error_only_for_non_canonical(): void
+    {
+        $this->assertNull(EmojiRules::validateCanonicalShortcode(':wave:'));
+        $this->assertNotNull(EmojiRules::validateCanonicalShortcode('png'));
+    }
 }

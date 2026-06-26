@@ -51,6 +51,7 @@ pianotell-flamoji:
       import_json_button: Import JSON
       export_json_button: Export JSON
       import_emojis_message: This will import emoji configurations only. You need to upload emoji images manually.
+      import_legacy_shortcodes: "Imported {count} emoji whose shortcodes don't follow the recommended :word: convention: {shortcodes}. They were imported as-is and still work, but consider updating them."
 
       edit_emoji:
         modal_title: Add Emoji
@@ -58,8 +59,9 @@ pianotell-flamoji:
         emoji_title_label: Emoji Title
         emoji_title_text: "A friendly name shown in the picker preview and matched when searching. Optional."
         delete_emoji_confirmation: "Are you sure you want to delete this emoji?"
-        text_to_replace_label: Text to Replace
-        text_to_replace_text: "The unique shortcode that members type to insert this emoji, with surrounding colons. Required, and must be different from every other emoji. Tip: prefix your shortcodes (e.g. :flamoji_partyparrot:) so they read clearly and won't clash with standard emoji."
+        text_to_replace_label: Shortcode
+        text_to_replace_text: "The text members type to insert this emoji. Must be wrapped in colons and contain only letters, numbers, and the characters _ + - (e.g. :flamoji_partyparrot:). Required, and must be unique. Tip: prefix your shortcodes so they read clearly and won't clash with standard emoji."
+        shortcode_invalid: "Wrap the shortcode in colons and use only letters, numbers, and _ + - (e.g. :flamoji_partyparrot:)."
         category_label: Category
         category_placeholder: e.g. Memes
         category_text: "Optional. Custom emojis sharing the same category appear together in their own picker tab. Leave blank for the default Custom tab."

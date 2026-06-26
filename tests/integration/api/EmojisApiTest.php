@@ -267,6 +267,60 @@ class EmojisApiTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function create_endpoint_rejects_non_canonical_shortcode(): void
+    {
+        // A bare word (no surrounding colons) is the foot-gun the canonical
+        // rule guards against: the formatter would match it as a substring.
+        $response = $this->send($this->request('POST', '/api/flamojis', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => [
+                'title' => 'Bare',
+                'text_to_replace' => 'png',
+                'path' => '/png.png',
+            ]]],
+        ]));
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertFalse(Emoji::where('text_to_replace', 'png')->exists());
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function update_endpoint_enforces_canonical_when_changing_trigger(): void
+    {
+        $response = $this->send($this->request('PATCH', '/api/flamojis/1', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => ['text_to_replace' => 'png']]],
+        ]));
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertSame(':wave:', Emoji::find(1)->text_to_replace);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function update_endpoint_grandfathers_legacy_trigger_when_only_title_changes(): void
+    {
+        // Seed a row whose trigger predates the canonical rule (a bare word).
+        // Editing only its title must NOT re-validate the trigger, so the
+        // save succeeds and the legacy trigger keeps working.
+        $this->send($this->request('GET', '/api/flamojis'));
+        Emoji::query()->insert([
+            'id' => 99,
+            'title' => 'Legacy',
+            'text_to_replace' => 'legacyword',
+            'path' => '/legacy.png',
+        ]);
+
+        $response = $this->send($this->request('PATCH', '/api/flamojis/99', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => ['title' => 'Legacy Renamed']]],
+        ]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertSame('Legacy Renamed', Emoji::find(99)->title);
+        $this->assertSame('legacyword', Emoji::find(99)->text_to_replace);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function update_endpoint_rejects_normal_user(): void
     {
         $response = $this->send($this->request('PATCH', '/api/flamojis/1', [
@@ -310,7 +364,7 @@ class EmojisApiTest extends TestCase
             ]],
         ]));
 
-        $this->assertEquals(204, $response->getStatusCode());
+        $this->assertEquals(200, $response->getStatusCode());
         $this->assertNotNull(Emoji::where('text_to_replace', ':a:')->first());
         $this->assertNotNull(Emoji::where('text_to_replace', ':b:')->first());
     }
@@ -326,7 +380,7 @@ class EmojisApiTest extends TestCase
             ]],
         ]));
 
-        $this->assertEquals(204, $response->getStatusCode());
+        $this->assertEquals(200, $response->getStatusCode());
         $this->assertSame('Memes', Emoji::where('text_to_replace', ':a:')->first()->category);
         $this->assertNull(Emoji::where('text_to_replace', ':b:')->first()->category);
     }
@@ -345,9 +399,47 @@ class EmojisApiTest extends TestCase
             ]],
         ]));
 
-        $this->assertEquals(204, $response->getStatusCode());
+        $this->assertEquals(200, $response->getStatusCode());
         $this->assertNull(Emoji::where('text_to_replace', ':legacy1:')->first()->category);
         $this->assertNull(Emoji::where('text_to_replace', ':legacy2:')->first()->category);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function import_endpoint_is_tolerant_of_non_canonical_and_reports_them(): void
+    {
+        // Import is the backwards-compat surface: non-canonical shortcodes
+        // still import, but the endpoint reports them so the admin gets a
+        // non-blocking heads-up.
+        $response = $this->send($this->request('POST', '/api/flamojis/import', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => [
+                ['title' => 'Good', 'text_to_replace' => ':good:', 'path' => '/good.png'],
+                ['title' => 'Legacy', 'text_to_replace' => 'bareword', 'path' => '/bare.png'],
+            ]],
+        ]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        // Both rows persisted (tolerant import).
+        $this->assertNotNull(Emoji::where('text_to_replace', ':good:')->first());
+        $this->assertNotNull(Emoji::where('text_to_replace', 'bareword')->first());
+        // Only the non-canonical trigger is reported.
+        $body = json_decode($response->getBody()->getContents(), true);
+        $this->assertSame(['bareword'], $body['legacyShortcodes']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function import_endpoint_reports_no_legacy_shortcodes_when_all_canonical(): void
+    {
+        $response = $this->send($this->request('POST', '/api/flamojis/import', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => [
+                ['title' => 'A', 'text_to_replace' => ':a:', 'path' => '/a.png'],
+            ]],
+        ]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $body = json_decode($response->getBody()->getContents(), true);
+        $this->assertSame([], $body['legacyShortcodes']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

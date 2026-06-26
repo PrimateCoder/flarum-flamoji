@@ -28,6 +28,25 @@ export default class EditEmojiModal extends FormModal {
     this.textToReplace = Stream(this.emoji.textToReplace() || '');
     this.category = Stream(this.emoji.category() || '');
     this.path = Stream(this.emoji.path() || '');
+
+    // Remember the stored trigger so we can grandfather it: an existing
+    // (possibly legacy, non-canonical) shortcode that the admin doesn't
+    // change must still be saveable when editing other fields.
+    this.originalTrigger = (this.emoji.textToReplace() || '').trim();
+  }
+
+  // Canonical shortcode format, mirrored from the server (EmojiRules).
+  // Returns an error string when the *changed* trigger isn't canonical, or
+  // null when it's valid or an unchanged legacy value.
+  shortcodeError() {
+    const value = this.textToReplace().trim();
+    if (value === '') return null; // emptiness handled on submit / server-side
+    // Grandfather an unchanged existing trigger.
+    if (this.emoji.exists && value === this.originalTrigger) return null;
+    if (!/^:[a-zA-Z0-9_+-]+:$/.test(value)) {
+      return app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.shortcode_invalid', {}, true);
+    }
+    return null;
   }
 
   className() {
@@ -70,12 +89,16 @@ export default class EditEmojiModal extends FormModal {
       50
     );
 
+    const shortcodeError = this.shortcodeError();
+
     items.add(
       'textToReplace',
-      <div className="Form-group">
+      <div className={'Form-group' + (shortcodeError ? ' has-error' : '')}>
         <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.text_to_replace_label')}</label>
         <input className="FormControl" placeholder=":flamoji_partyparrot:" bidi={this.textToReplace} />
-        <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.text_to_replace_text')}</div>
+        <div className={'helpText' + (shortcodeError ? ' EditEmojiModal-error' : '')}>
+          {shortcodeError || app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.text_to_replace_text')}
+        </div>
       </div>,
       40
     );
@@ -119,6 +142,7 @@ export default class EditEmojiModal extends FormModal {
             type: 'submit',
             className: 'Button Button--primary EditEmojiModal-save',
             loading: this.loading,
+            disabled: !!shortcodeError,
           },
           app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.submit_button')
         )}
@@ -161,6 +185,12 @@ export default class EditEmojiModal extends FormModal {
 
   onsubmit(e) {
     e.preventDefault();
+
+    // Defense-in-depth: the submit button is disabled when invalid, but
+    // guard here too (e.g. Enter key) so we never POST a non-canonical
+    // shortcode the server will reject.
+    if (this.shortcodeError()) return;
+
     this.loading = true;
 
     const exists = this.emoji.exists;
