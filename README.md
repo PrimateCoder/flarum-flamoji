@@ -16,6 +16,8 @@ Screenshot:
 - Add an emoji picker to the text editor (compatible with dark mode).
 - **Picker style is configurable** — choose [Twemoji](https://github.com/jdecked/twemoji) glyphs (sourced from a jsDelivr-hosted spritesheet) or your operating system's native emoji font, or leave the picker on `Auto` to mirror what posts actually display (Twemoji when [`flarum/emoji`](https://github.com/flarum/emoji) is enabled, native otherwise).
 - Add custom emojis to the picker.
+- **Organize custom emojis into named categories** — assign each a freeform category and it gets its own tab in the picker.
+- **Sticker mode** — an optional admin toggle that renders custom emojis as large stickers in posts, the composer preview, and the picker.
 - Import and export custom emoji configurations.
 - Picker code and emoji data load lazily on first open (no impact on initial page load); when Twemoji is selected, the image spritesheet is fetched from jsDelivr on first picker render. Native mode adds zero image bytes.
 
