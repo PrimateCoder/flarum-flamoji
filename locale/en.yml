@@ -12,6 +12,8 @@ pianotell-flamoji:
       general_ui_settings_heading: General UI Settings
       show_variants_label: Show skin-tone variants
       show_variants_text: Some emojis have skin tone variants. When an emoji is selected in the picker that has variants, a variant popup will appear so the user can select the desired variant.
+      sticker_mode_label: Sticker mode
+      sticker_mode_text: Render custom emoji as large stickers — in posts, the live composer preview, and an enlarged picker grid. Because only custom emoji are enlarged, the picker is restricted to your custom emoji while this is on. Off by default.
       auto_hide_label: Auto hide
       auto_hide_text: Hide the picker when an emoji is selected.
       show_preview_label: Show preview section

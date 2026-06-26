@@ -16,5 +16,6 @@
     "Custom"
   ],
   "navCount": 10,
+  "tileSize": 36,
   "firstTileHasSpriteBackground": true
 }

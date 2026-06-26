@@ -8,6 +8,7 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runSpec, openComposer } from '../../.pianotell/tests/ux/helpers.mjs';
+import { applySettings, DEFAULTS } from './_admin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -40,6 +41,11 @@ await runSpec({
   specName: 'picker-loading',
   outputDir: HERE,
 }, async ({ context, page, check, BASE }) => {
+  // Ensure default sizing — the sub-pixel nav guard check below assumes the
+  // default grid; sticker mode (80px tiles) would legitimately exceed it.
+  console.log('\n[setup] applying defaults (sticker mode off)');
+  await applySettings(page, DEFAULTS, BASE);
+
   // ---------------------------------------------------------------
   // Phase 1: Loader appears while picker is loading; vanishes after.
   // ---------------------------------------------------------------

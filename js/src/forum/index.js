@@ -28,9 +28,29 @@ const t_p = t + 'emoji-mart.';
 // `data.sheet.cols`/`data.sheet.rows`.
 const TWEMOJI_SPRITESHEET_URL = 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/sheets-256/64.png';
 
+// "Sticker mode" grid (admin toggle, flamoji.sticker_mode). 64px glyph in an
+// 80px tile; `dynamicWidth` lets emoji-mart compute perLine from the popup's
+// CSS width (set responsively in less/forum.less) rather than a fixed column
+// count, so the grid adapts to the viewport / mobile. See the emoji-mart
+// "Dynamic width" example: dynamicWidth + a CSS width on em-emoji-picker.
+const STICKER_GRID = { emojiSize: 64, emojiButtonSize: 80, dynamicWidth: true };
+
 app.initializers.add(
   'pianotell-flamoji',
   () => {
+    // Sticker mode is a forum-wide style toggle: when on, custom emoji
+    // render at sticker size everywhere (existing posts + the live composer
+    // preview), not just in the picker. Drive a root class that
+    // less/forum.less keys the enlarged `span.flamoji img` rule off of.
+    // `app.forum` isn't populated until AFTER initializers run, so defer the
+    // read to a microtask (and guard it) — reading it synchronously here
+    // throws and aborts the whole initializer.
+    Promise.resolve().then(() => {
+      if (app.forum && app.forum.attribute('flamoji.sticker_mode')) {
+        document.documentElement.classList.add('flamoji--sticker');
+      }
+    });
+
     /**
      * Build the emoji-mart i18n object from Flarum's translator. emoji-mart
      * shallow-merges the `i18n` prop on top of its built-in English
@@ -236,6 +256,11 @@ app.initializers.add(
       if (this._flamojiLoader) return;
       const loader = document.createElement('div');
       loader.className = 'flamoji-picker-loader';
+      // Match the loader's footprint to the (responsive) sticker picker so
+      // the swap from placeholder to real picker isn't a size jump.
+      if (app.forum.attribute('flamoji.sticker_mode')) {
+        loader.classList.add('flamoji-picker-loader--sticker');
+      }
       loader.setAttribute('role', 'status');
       loader.setAttribute('aria-live', 'polite');
 
@@ -426,7 +451,7 @@ app.initializers.add(
       const { Picker } = emojiMartModule;
       const data = dataModule.default || dataModule;
 
-      const specifiedCategories = JSON.parse(app.forum.attribute('flamoji.specify_categories'));
+      let specifiedCategories = JSON.parse(app.forum.attribute('flamoji.specify_categories'));
       const sortingArr = getEmojiCategories();
       // Order of `categories` in the picker prop drives nav-tab order.
       specifiedCategories.sort((a, b) => sortingArr.indexOf(a) - sortingArr.indexOf(b));
@@ -546,6 +571,7 @@ app.initializers.add(
       const showSearch = !!app.forum.attribute('flamoji.show_search');
       const showVariants = !!app.forum.attribute('flamoji.show_variants');
       const showCategoryButtons = !!app.forum.attribute('flamoji.show_category_buttons');
+      const stickerMode = !!app.forum.attribute('flamoji.sticker_mode');
 
       // emoji-mart's `categories` prop is an explicit allow-list. When
       // showRecents is enabled, we still need 'frequent' on the list or
@@ -554,6 +580,17 @@ app.initializers.add(
       // it appears first as emoji-mart expects.
       if (showRecents && specifiedCategories.indexOf('frequent') === -1) {
         specifiedCategories.unshift('frequent');
+      }
+
+      // Sticker mode only enlarges custom emoji (the unicode set keeps its
+      // default size, since those render as fonts/sprites, not <img>). So
+      // when it's on, restrict the picker to the custom categories only —
+      // the built-in unicode tabs and Frequent would otherwise sit at normal
+      // size amongst the stickers and just add noise. Guard on customGroups
+      // so a forum with no custom emoji still gets the normal picker rather
+      // than an empty one.
+      if (stickerMode && customGroups.size) {
+        specifiedCategories = specifiedCategories.filter((id) => id.indexOf('flamoji_custom') === 0);
       }
 
       // Match the picker's emoji rendering to what posts will actually
@@ -588,14 +625,13 @@ app.initializers.add(
         autoFocus: false,
         set: useTwemoji ? 'twitter' : 'native',
         ...(useTwemoji ? { getSpritesheetURL: () => TWEMOJI_SPRITESHEET_URL } : {}),
-        // Tile sizing — use emoji-mart defaults (perLine: 9,
-        // emojiSize: 24, emojiButtonSize: 36). We previously bumped
-        // these for a chunkier grid, but at larger sizes WebKit's
-        // sub-pixel-rounded IntersectionObserver in emoji-mart's
-        // NavBar reliably mis-picks the previous category when
-        // clicking Travel & Places / Flags (the indicator highlights
-        // the wrong icon). Defaults stay clean across all category
-        // configurations.
+        // Tile sizing. Default (perLine 9 / emojiSize 24 / emojiButtonSize
+        // 36) is emoji-mart's own. When sticker mode is on we enlarge the
+        // grid (see STICKER_GRID); note that larger emojiButtonSize can trip
+        // a WebKit sub-pixel IntersectionObserver bug in emoji-mart's NavBar
+        // that mis-highlights a category on click — acceptable for the
+        // opt-in sticker mode.
+        ...(stickerMode ? STICKER_GRID : {}),
         previewPosition: showPreview ? 'bottom' : 'none',
         searchPosition: showSearch ? 'sticky' : 'none',
         skinTonePosition: showVariants ? 'preview' : 'none',
@@ -636,6 +672,10 @@ app.initializers.add(
       // changes (e.g. category navigation expanding rows).
       this.picker = picker;
       picker.classList.add('flamoji-picker-popup');
+      // In sticker mode the popup gets a responsive CSS width/height (see
+      // less/forum.less); emoji-mart's dynamicWidth then computes perLine
+      // from that width.
+      if (stickerMode) picker.classList.add('flamoji-picker-popup--sticker');
       picker.setAttribute('role', 'dialog');
       picker.setAttribute('aria-label', app.translator.trans(t + 'composer.emoji_picker_label', {}, true));
       // Tear down the loading placeholder right before the real picker is

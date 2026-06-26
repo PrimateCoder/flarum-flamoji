@@ -23,6 +23,7 @@ cd "$ROOT"
 SPECS=(
   tests/ux/picker-positioning.spec.mjs
   tests/ux/picker-features.spec.mjs
+  tests/ux/sticker-render.spec.mjs
   tests/ux/admin-options.spec.mjs
   tests/ux/custom-emoji.spec.mjs
   tests/ux/import-export.spec.mjs

@@ -14,5 +14,6 @@
     "Flags"
   ],
   "navCount": 8,
+  "tileSize": 36,
   "firstTileHasSpriteBackground": true
 }

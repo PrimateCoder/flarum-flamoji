@@ -40,6 +40,7 @@ export const DEFAULTS = Object.freeze({
   show_category_buttons: true,
   show_recents: true,
   prepopulate_recents: true,
+  sticker_mode: false,
   picker_set: 'auto',
   frequent_rows: 4,
   // All eight categories enabled = "no narrowing".
@@ -54,6 +55,7 @@ const SWITCH_LABELS = {
   show_preview: 'Show preview section',
   show_search: 'Show search input',
   show_variants: 'Show skin-tone variants',
+  sticker_mode: 'Sticker mode',
   show_category_buttons: 'Show category buttons',
   show_recents: 'Show (and save) frequently used emojis',
 };

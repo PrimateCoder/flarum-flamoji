@@ -1,6 +1,7 @@
 ### 2.2.0 — 2026-06-25
 
 - **Custom emoji categories** — custom emojis can now be organized into named tabs in the picker. Assign each emoji a freeform **Category** in the admin panel; emojis sharing a category appear together under their own picker tab, with the category's first emoji as the tab icon. Emojis left without a category stay in the default Custom tab. Categories are included in JSON import/export.
+- **Sticker mode** — a new admin toggle ("Emoji Settings" → "Sticker mode") that renders custom emoji as large stickers forum-wide: in posts, the live composer preview, and an enlarged picker grid. The picker adapts responsively to the screen (mobile-friendly). Since only custom emoji are enlarged, the picker is restricted to your custom emoji while sticker mode is on. Off by default; nothing changes unless enabled.
 
 ### 2.1.0 — 2026-05-03
 

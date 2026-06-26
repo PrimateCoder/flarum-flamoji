@@ -17,6 +17,10 @@
       "checked": true
     },
     {
+      "label": "Sticker mode",
+      "checked": false
+    },
+    {
       "label": "Show category buttons",
       "checked": true
     },

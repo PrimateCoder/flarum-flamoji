@@ -339,6 +339,7 @@ class EmojisApiTest extends TestCase
         $this->assertTrue($attrs['flamoji.show_preview']);
         $this->assertTrue($attrs['flamoji.show_search']);
         $this->assertTrue($attrs['flamoji.show_variants']);
+        $this->assertFalse($attrs['flamoji.sticker_mode']);
         $this->assertSame('auto', $attrs['flamoji.picker_set']);
         $this->assertTrue($attrs['flamoji.show_category_buttons']);
         $this->assertTrue($attrs['flamoji.show_recents']);
