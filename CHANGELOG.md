@@ -1,3 +1,9 @@
+### 2.3.0 — 2026-06-26
+
+- **Frequently Used now starts empty and reflects only emoji you've actually used.** On a fresh browser it previously pre-filled with emoji-mart's built-in "popular" defaults — generic Unicode emoji unrelated to your forum, and in sticker/custom-only mode (or with categories disabled) even emoji the picker couldn't insert. The tab now begins empty and fills from each member's own picks — the standard emoji-picker behavior — saved per browser.
+- **Removed the "Pre-populate with popular emojis" admin setting** (added in 2.1.0). Suppressing those defaults is now built-in and unconditional, so the toggle is no longer needed; the stored setting is cleaned up automatically on upgrade.
+- **Fixed: the Frequently Used tab was missing in sticker mode.** Sticker mode restricts the picker to your custom emoji, but its category filter also dropped Frequently Used even when enabled. It now stays available (surfacing your most-used stickers) and follows the "Show frequently used emojis" setting just like normal mode.
+
 ### 2.2.1 — 2026-06-25
 
 - **Shortcode convention enforcement** — the emoji trigger field is now labelled **Shortcode** and validates the recommended `:word:` format (wrapped in colons; letters, numbers, `_`, `+`, `-` only) when you add an emoji or change an existing one's shortcode. This prevents bare-word triggers (e.g. `png`) that the formatter would otherwise match anywhere in a post. Existing shortcodes are grandfathered: editing a legacy emoji's other fields won't force you to fix its trigger.
