@@ -89,7 +89,7 @@ class EmojiRules
 
     /**
      * Canonical shortcode format: wrapped in colons, with an inner of
-     * letters, digits, dash, underscore or plus — e.g. `:flamoji_party:`.
+     * letters, digits, dash, underscore or plus — e.g. `:myemoji_party:`.
      *
      * Enforced for NEW or CHANGED triggers (interactive create/edit), but
      * NOT for import or pre-existing rows, so older non-conforming triggers
@@ -111,7 +111,7 @@ class EmojiRules
     public static function validateCanonicalShortcode(string $value): ?string
     {
         if (! self::isCanonicalShortcode($value)) {
-            return 'The shortcode must be wrapped in colons and contain only letters, numbers, dashes, underscores or plus signs — e.g. :flamoji_party:.';
+            return 'The shortcode must be wrapped in colons and contain only letters, numbers, dashes, underscores or plus signs — e.g. :myemoji_party:.';
         }
         return null;
     }

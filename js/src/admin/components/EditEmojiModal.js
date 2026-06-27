@@ -95,7 +95,7 @@ export default class EditEmojiModal extends FormModal {
       'textToReplace',
       <div className={'Form-group' + (shortcodeError ? ' has-error' : '')}>
         <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.text_to_replace_label')}</label>
-        <input className="FormControl" placeholder=":flamoji_partyparrot:" bidi={this.textToReplace} />
+        <input className="FormControl" placeholder=":myemoji_partyparrot:" bidi={this.textToReplace} />
         <div className={'helpText' + (shortcodeError ? ' EditEmojiModal-error' : '')}>
           {shortcodeError || app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.text_to_replace_text')}
         </div>
