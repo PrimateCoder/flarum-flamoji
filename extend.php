@@ -44,7 +44,6 @@ return [
         ->default('pianotell-flamoji.show_category_buttons', true)
         ->default('pianotell-flamoji.sticker_mode', false)
         ->default('pianotell-flamoji.show_recents', true)
-        ->default('pianotell-flamoji.prepopulate_recents', true)
         ->default('pianotell-flamoji.frequent_rows', 4)
         ->default('pianotell-flamoji.specify_categories', '["people","nature","foods","activity","places","objects","symbols","flags"]')
         ->serializeToForum('flamoji.auto_hide', 'pianotell-flamoji.auto_hide', 'boolVal')
@@ -55,7 +54,6 @@ return [
         ->serializeToForum('flamoji.show_category_buttons', 'pianotell-flamoji.show_category_buttons', 'boolVal')
         ->serializeToForum('flamoji.sticker_mode', 'pianotell-flamoji.sticker_mode', 'boolVal')
         ->serializeToForum('flamoji.show_recents', 'pianotell-flamoji.show_recents', 'boolVal')
-        ->serializeToForum('flamoji.prepopulate_recents', 'pianotell-flamoji.prepopulate_recents', 'boolVal')
         ->serializeToForum('flamoji.frequent_rows', 'pianotell-flamoji.frequent_rows', 'intVal')
         ->serializeToForum('flamoji.specify_categories', 'pianotell-flamoji.specify_categories'),
 

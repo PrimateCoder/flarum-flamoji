@@ -31,29 +31,40 @@
 //
 // Failure mode: writes tests/ux/_failure.png + _failures.json, exits non-zero.
 
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { runSpec, openComposer } from '../../.pianotell/tests/ux/helpers.mjs';
-import { applySettings, restoreDefaults, DEFAULTS, deleteAllCustomEmojis } from './_admin.mjs';
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { runSpec, openComposer } from "../../.pianotell/tests/ux/helpers.mjs";
+import {
+  applySettings,
+  restoreDefaults,
+  DEFAULTS,
+  deleteAllCustomEmojis,
+} from "./_admin.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 // ---------- forum-side helpers (shared shape with picker-features) ----------
 
 async function openPicker(page) {
-  await page.waitForSelector('button.Button-flamoji, button[title*="moji" i]', { timeout: 10_000 });
+  await page.waitForSelector('button.Button-flamoji, button[title*="moji" i]', {
+    timeout: 10_000,
+  });
   await page.click('button.Button-flamoji, button[title*="moji" i]');
-  await page.waitForSelector('em-emoji-picker.flamoji-picker-popup', { timeout: 15_000 });
+  await page.waitForSelector("em-emoji-picker.flamoji-picker-popup", {
+    timeout: 15_000,
+  });
   // Some scenarios disable the search input; fall back to nav or first
   // category-tile as our "picker is alive" signal.
   await page.waitForFunction(
     () => {
-      const sr = document.querySelector('em-emoji-picker.flamoji-picker-popup')?.shadowRoot;
+      const sr = document.querySelector(
+        "em-emoji-picker.flamoji-picker-popup"
+      )?.shadowRoot;
       if (!sr) return false;
       return (
         sr.querySelector('input[type="search"]') ||
-        sr.querySelector('nav button[aria-label]') ||
-        sr.querySelector('.category button')
+        sr.querySelector("nav button[aria-label]") ||
+        sr.querySelector(".category button")
       );
     },
     { timeout: 15_000 }
@@ -64,33 +75,40 @@ async function openPicker(page) {
 // One-call structured snapshot of every assertable feature.
 async function snapshot(page) {
   return await page.evaluate(() => {
-    const picker = document.querySelector('em-emoji-picker.flamoji-picker-popup');
-    if (!picker) return { error: 'no picker' };
+    const picker = document.querySelector(
+      "em-emoji-picker.flamoji-picker-popup"
+    );
+    if (!picker) return { error: "no picker" };
     const sr = picker.shadowRoot;
-    const navButtons = [...sr.querySelectorAll('nav button[aria-label]')]
-      .map((b) => b.getAttribute('aria-label'));
-    const previewEl = sr.querySelector('.preview-placeholder, [class*="preview"]');
+    const navButtons = [...sr.querySelectorAll("nav button[aria-label]")].map(
+      (b) => b.getAttribute("aria-label")
+    );
+    const previewEl = sr.querySelector(
+      '.preview-placeholder, [class*="preview"]'
+    );
     // Identify the rendering set from the inner emoji span. Twitter
     // tiles have data-emoji-set="twitter" + a CSS background-image
     // pointing at the Twemoji sprite sheet; native tiles render the
     // raw glyph as text with data-emoji-set="native".
-    const sampleSpan = sr.querySelector('.category .emoji-mart-emoji');
-    const sampleSpanHTML = sampleSpan?.outerHTML || '';
+    const sampleSpan = sr.querySelector(".category .emoji-mart-emoji");
+    const sampleSpanHTML = sampleSpan?.outerHTML || "";
     return {
-      visible: picker.style.display !== 'none',
+      visible: picker.style.display !== "none",
       hasSearchInput: !!sr.querySelector('input[type="search"]'),
       navCount: navButtons.length,
       navLabels: navButtons,
       hasPreview: !!previewEl,
-      hasSkinToneButton: !!sr.querySelector('.skin-tone-button'),
-      tileEmojiSet: sampleSpan?.getAttribute('data-emoji-set') || null,
+      hasSkinToneButton: !!sr.querySelector(".skin-tone-button"),
+      tileEmojiSet: sampleSpan?.getAttribute("data-emoji-set") || null,
       // Twemoji rendering: inner <span> carries `background-image:
       // url(.../emoji-datasource-twitter/...)`. Native rendering: inner
       // span has no background-image and the glyph is a literal Unicode
       // character (with a `font-family` fallback that *also* contains the
       // word "Twemoji" — don't match against font-family by mistake).
       tileUsesTwemojiSprite:
-        /background-image\s*:\s*url\([^)]*(emoji-datasource-twitter|twemoji)/i.test(sampleSpanHTML),
+        /background-image\s*:\s*url\([^)]*(emoji-datasource-twitter|twemoji)/i.test(
+          sampleSpanHTML
+        ),
     };
   });
 }
@@ -99,12 +117,14 @@ async function snapshot(page) {
 // composer textarea grew.
 async function pickFirstEmoji(page) {
   const before = await page.evaluate(
-    () => document.querySelector('.ComposerBody textarea')?.value?.length ?? 0
+    () => document.querySelector(".ComposerBody textarea")?.value?.length ?? 0
   );
   const ok = await page.evaluate(() => {
-    const sr = document.querySelector('em-emoji-picker.flamoji-picker-popup').shadowRoot;
-    const tile = [...sr.querySelectorAll('.category button')].find(
-      (b) => !b.hasAttribute('aria-selected')
+    const sr = document.querySelector(
+      "em-emoji-picker.flamoji-picker-popup"
+    ).shadowRoot;
+    const tile = [...sr.querySelectorAll(".category button")].find(
+      (b) => !b.hasAttribute("aria-selected")
     );
     if (!tile) return false;
     tile.click();
@@ -112,15 +132,15 @@ async function pickFirstEmoji(page) {
   });
   await page.waitForTimeout(200);
   const after = await page.evaluate(
-    () => document.querySelector('.ComposerBody textarea')?.value?.length ?? 0
+    () => document.querySelector(".ComposerBody textarea")?.value?.length ?? 0
   );
   return { ok, delta: after - before };
 }
 
 async function isPickerVisible(page) {
   return await page.evaluate(() => {
-    const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
-    return !!p && p.style.display !== 'none';
+    const p = document.querySelector("em-emoji-picker.flamoji-picker-popup");
+    return !!p && p.style.display !== "none";
   });
 }
 
@@ -128,190 +148,260 @@ async function isPickerVisible(page) {
 // composer + picker. `overrides` keys mirror DEFAULTS in _admin.mjs.
 async function bootScenario(page, overrides, base) {
   await applySettings(page, overrides, base);
-  await page.goto(base, { waitUntil: 'networkidle' });
+  await page.goto(base, { waitUntil: "networkidle" });
   await openComposer(page);
   await openPicker(page);
 }
 
 // ---------- main ----------
 
-await runSpec({
-  specName: 'admin-options',
-  outputDir: HERE,
-}, async ({ page, check, BASE }) => {
-  await page.context().setExtraHTTPHeaders({ 'cache-control': 'no-cache' });
+await runSpec(
+  {
+    specName: "admin-options",
+    outputDir: HERE,
+  },
+  async ({ page, check, BASE }) => {
+    await page.context().setExtraHTTPHeaders({ "cache-control": "no-cache" });
 
-  // Establish the all-on baseline before running scenarios — picks up
-  // any DB drift from earlier admin sessions.
-  console.log('\n[setup] restoring all-on defaults via admin UI');
-  await restoreDefaults(page, BASE);
+    // Establish the all-on baseline before running scenarios — picks up
+    // any DB drift from earlier admin sessions.
+    console.log("\n[setup] restoring all-on defaults via admin UI");
+    await restoreDefaults(page, BASE);
 
-  // Remove any custom emoji so the nav-count assertions (esp.
-  // specify_categories) are independent of ambient custom categories,
-  // which would otherwise add extra tabs (one per category).
-  console.log('[setup] clearing custom emoji for deterministic nav counts');
-  await deleteAllCustomEmojis(page, BASE);
+    // Remove any custom emoji so the nav-count assertions (esp.
+    // specify_categories) are independent of ambient custom categories,
+    // which would otherwise add extra tabs (one per category).
+    console.log("[setup] clearing custom emoji for deterministic nav counts");
+    await deleteAllCustomEmojis(page, BASE);
 
-  // --- 1. show_search ON / OFF ---
-  console.log('\n[scenario] show_search=true (baseline ON)');
-  await bootScenario(page, { show_search: true }, BASE);
-  let s = await snapshot(page);
-  check('show_search=true → search input present', s.hasSearchInput);
+    // --- 1. show_search ON / OFF ---
+    console.log("\n[scenario] show_search=true (baseline ON)");
+    await bootScenario(page, { show_search: true }, BASE);
+    let s = await snapshot(page);
+    check("show_search=true → search input present", s.hasSearchInput);
 
-  console.log('\n[scenario] show_search=false');
-  await bootScenario(page, { show_search: false }, BASE);
-  s = await snapshot(page);
-  check('show_search=false → search input absent', !s.hasSearchInput);
+    console.log("\n[scenario] show_search=false");
+    await bootScenario(page, { show_search: false }, BASE);
+    s = await snapshot(page);
+    check("show_search=false → search input absent", !s.hasSearchInput);
 
-  // --- 2. show_category_buttons ON / OFF ---
-  console.log('\n[scenario] show_category_buttons=true');
-  await bootScenario(page, { show_search: true, show_category_buttons: true }, BASE);
-  s = await snapshot(page);
-  check('show_category_buttons=true → nav has buttons', s.navCount > 0,
-        `navCount=${s.navCount}`);
+    // --- 2. show_category_buttons ON / OFF ---
+    console.log("\n[scenario] show_category_buttons=true");
+    await bootScenario(
+      page,
+      { show_search: true, show_category_buttons: true },
+      BASE
+    );
+    s = await snapshot(page);
+    check(
+      "show_category_buttons=true → nav has buttons",
+      s.navCount > 0,
+      `navCount=${s.navCount}`
+    );
 
-  console.log('\n[scenario] show_category_buttons=false');
-  await bootScenario(page, { show_category_buttons: false }, BASE);
-  s = await snapshot(page);
-  check('show_category_buttons=false → no category nav buttons', s.navCount === 0,
-        `navCount=${s.navCount} labels=${JSON.stringify(s.navLabels)}`);
+    console.log("\n[scenario] show_category_buttons=false");
+    await bootScenario(page, { show_category_buttons: false }, BASE);
+    s = await snapshot(page);
+    check(
+      "show_category_buttons=false → no category nav buttons",
+      s.navCount === 0,
+      `navCount=${s.navCount} labels=${JSON.stringify(s.navLabels)}`
+    );
 
-  // --- 3. show_preview ON / OFF ---
-  // NOTE: emoji-mart renders the skin-tone selector inside the preview row.
-  // With show_preview=false AND show_variants=true, there is no preview
-  // pane to host the skin-tone widget — emoji-mart drops the skin-tone
-  // widget too. To get a clean signal on `show_preview` alone, hold
-  // `show_variants` off here.
-  console.log('\n[scenario] show_preview=true, show_variants=false');
-  await bootScenario(page, {
-    show_category_buttons: true, show_preview: true, show_variants: false,
-  }, BASE);
-  s = await snapshot(page);
-  check('show_preview=true → preview placeholder rendered', s.hasPreview);
+    // --- 3. show_preview ON / OFF ---
+    // NOTE: emoji-mart renders the skin-tone selector inside the preview row.
+    // With show_preview=false AND show_variants=true, there is no preview
+    // pane to host the skin-tone widget — emoji-mart drops the skin-tone
+    // widget too. To get a clean signal on `show_preview` alone, hold
+    // `show_variants` off here.
+    console.log("\n[scenario] show_preview=true, show_variants=false");
+    await bootScenario(
+      page,
+      {
+        show_category_buttons: true,
+        show_preview: true,
+        show_variants: false,
+      },
+      BASE
+    );
+    s = await snapshot(page);
+    check("show_preview=true → preview placeholder rendered", s.hasPreview);
 
-  console.log('\n[scenario] show_preview=false, show_variants=false');
-  await bootScenario(page, { show_preview: false, show_variants: false }, BASE);
-  s = await snapshot(page);
-  check('show_preview=false → preview placeholder absent', !s.hasPreview);
+    console.log("\n[scenario] show_preview=false, show_variants=false");
+    await bootScenario(
+      page,
+      { show_preview: false, show_variants: false },
+      BASE
+    );
+    s = await snapshot(page);
+    check("show_preview=false → preview placeholder absent", !s.hasPreview);
 
-  // --- 4. show_variants ON / OFF (preview held ON to host the widget) ---
-  console.log('\n[scenario] show_variants=true, show_preview=true');
-  await bootScenario(page, { show_variants: true, show_preview: true }, BASE);
-  s = await snapshot(page);
-  check('show_variants=true → skin-tone selector present', s.hasSkinToneButton);
+    // --- 4. show_variants ON / OFF (preview held ON to host the widget) ---
+    console.log("\n[scenario] show_variants=true, show_preview=true");
+    await bootScenario(page, { show_variants: true, show_preview: true }, BASE);
+    s = await snapshot(page);
+    check(
+      "show_variants=true → skin-tone selector present",
+      s.hasSkinToneButton
+    );
 
-  console.log('\n[scenario] show_variants=false, show_preview=true');
-  await bootScenario(page, { show_variants: false, show_preview: true }, BASE);
-  s = await snapshot(page);
-  check('show_variants=false → skin-tone selector absent', !s.hasSkinToneButton);
+    console.log("\n[scenario] show_variants=false, show_preview=true");
+    await bootScenario(
+      page,
+      { show_variants: false, show_preview: true },
+      BASE
+    );
+    s = await snapshot(page);
+    check(
+      "show_variants=false → skin-tone selector absent",
+      !s.hasSkinToneButton
+    );
 
-  // --- 5. auto_hide ON / OFF (verified via picker visibility post-pick) ---
-  console.log('\n[scenario] auto_hide=true');
-  await bootScenario(page, { auto_hide: true }, BASE);
-  let pick = await pickFirstEmoji(page);
-  check('auto_hide=true → tile click registered', pick.ok && pick.delta > 0,
-        JSON.stringify(pick));
-  check('auto_hide=true → picker hidden after pick', !(await isPickerVisible(page)));
+    // --- 5. auto_hide ON / OFF (verified via picker visibility post-pick) ---
+    console.log("\n[scenario] auto_hide=true");
+    await bootScenario(page, { auto_hide: true }, BASE);
+    let pick = await pickFirstEmoji(page);
+    check(
+      "auto_hide=true → tile click registered",
+      pick.ok && pick.delta > 0,
+      JSON.stringify(pick)
+    );
+    check(
+      "auto_hide=true → picker hidden after pick",
+      !(await isPickerVisible(page))
+    );
 
-  console.log('\n[scenario] auto_hide=false');
-  await bootScenario(page, { auto_hide: false }, BASE);
-  pick = await pickFirstEmoji(page);
-  check('auto_hide=false → tile click registered', pick.ok && pick.delta > 0,
-        JSON.stringify(pick));
-  check('auto_hide=false → picker still visible after pick',
-        await isPickerVisible(page));
+    console.log("\n[scenario] auto_hide=false");
+    await bootScenario(page, { auto_hide: false }, BASE);
+    pick = await pickFirstEmoji(page);
+    check(
+      "auto_hide=false → tile click registered",
+      pick.ok && pick.delta > 0,
+      JSON.stringify(pick)
+    );
+    check(
+      "auto_hide=false → picker still visible after pick",
+      await isPickerVisible(page)
+    );
 
-  // --- 6. picker_set: twemoji vs native ---
-  console.log('\n[scenario] picker_set=twemoji');
-  await bootScenario(page, { picker_set: 'twemoji' }, BASE);
-  s = await snapshot(page);
-  check('picker_set=twemoji → tile renders Twemoji sprite',
-        s.tileEmojiSet === 'twitter' && s.tileUsesTwemojiSprite,
-        `set="${s.tileEmojiSet}" twemojiSprite=${s.tileUsesTwemojiSprite}`);
+    // --- 6. picker_set: twemoji vs native ---
+    console.log("\n[scenario] picker_set=twemoji");
+    await bootScenario(page, { picker_set: "twemoji" }, BASE);
+    s = await snapshot(page);
+    check(
+      "picker_set=twemoji → tile renders Twemoji sprite",
+      s.tileEmojiSet === "twitter" && s.tileUsesTwemojiSprite,
+      `set="${s.tileEmojiSet}" twemojiSprite=${s.tileUsesTwemojiSprite}`
+    );
 
-  console.log('\n[scenario] picker_set=native');
-  await bootScenario(page, { picker_set: 'native' }, BASE);
-  s = await snapshot(page);
-  check('picker_set=native → tile renders native (no Twemoji sprite)',
-        s.tileEmojiSet === 'native' && !s.tileUsesTwemojiSprite,
-        `set="${s.tileEmojiSet}" twemojiSprite=${s.tileUsesTwemojiSprite}`);
+    console.log("\n[scenario] picker_set=native");
+    await bootScenario(page, { picker_set: "native" }, BASE);
+    s = await snapshot(page);
+    check(
+      "picker_set=native → tile renders native (no Twemoji sprite)",
+      s.tileEmojiSet === "native" && !s.tileUsesTwemojiSprite,
+      `set="${s.tileEmojiSet}" twemojiSprite=${s.tileUsesTwemojiSprite}`
+    );
 
-  // --- 7. picker_set=auto resolution depends on flarum/emoji presence ---
-  // The serializer attribute `flamoji.has_emoji_extension` is the
-  // ground truth on this forum; auto must agree with it.
-  console.log('\n[scenario] picker_set=auto');
-  await bootScenario(page, { picker_set: 'auto' }, BASE);
-  const hasEmojiExt = await page.evaluate(
-    () => !!window.app.forum.attribute('flamoji.has_emoji_extension')
-  );
-  s = await snapshot(page);
-  const expectedAutoSet = hasEmojiExt ? 'twitter' : 'native';
-  check(
-    `picker_set=auto → resolves to "${expectedAutoSet}" given has_emoji_extension=${hasEmojiExt}`,
-    s.tileEmojiSet === expectedAutoSet,
-    `actual="${s.tileEmojiSet}"`
-  );
+    // --- 7. picker_set=auto resolution depends on flarum/emoji presence ---
+    // The serializer attribute `flamoji.has_emoji_extension` is the
+    // ground truth on this forum; auto must agree with it.
+    console.log("\n[scenario] picker_set=auto");
+    await bootScenario(page, { picker_set: "auto" }, BASE);
+    const hasEmojiExt = await page.evaluate(
+      () => !!window.app.forum.attribute("flamoji.has_emoji_extension")
+    );
+    s = await snapshot(page);
+    const expectedAutoSet = hasEmojiExt ? "twitter" : "native";
+    check(
+      `picker_set=auto → resolves to "${expectedAutoSet}" given has_emoji_extension=${hasEmojiExt}`,
+      s.tileEmojiSet === expectedAutoSet,
+      `actual="${s.tileEmojiSet}"`
+    );
 
-  // --- 8. specify_categories narrows the nav ---
-  console.log('\n[scenario] specify_categories=["people"] only');
-  await bootScenario(page, { specify_categories: ['people'] }, BASE);
-  s = await snapshot(page);
-  // Allow at most 3 nav buttons:
-  //   - the requested category
-  //   - Recently Used (show_recents defaults to true; this regression-
-  //     guards the fix that prepends 'frequent' to the allow-list, see
-  //     buildPicker in js/src/forum/index.js — without that, emoji-mart
-  //     silently drops the Recently Used tab)
-  //   - Custom (a custom emoji exists on this forum, see :pianotell:)
-  check(
-    'specify_categories=["people"] → nav has at most 3 buttons',
-    s.navCount >= 1 && s.navCount <= 3,
-    `navCount=${s.navCount} labels=${JSON.stringify(s.navLabels)}`
-  );
-  check(
-    'specify_categories=["people"] → only Smileys/People (and maybe Recently/Custom) remain',
-    s.navLabels.some((l) => /smileys|people/i.test(l)) &&
-      !s.navLabels.some((l) => /flag/i.test(l)),
-    `labels=${JSON.stringify(s.navLabels)}`
-  );
-  check(
-    'show_recents (default) + narrow specify_categories → Recently Used tab present',
-    s.navLabels.some((l) => /recent|frequent/i.test(l)),
-    `labels=${JSON.stringify(s.navLabels)}`
-  );
+    // --- 8. specify_categories narrows the nav ---
+    console.log('\n[scenario] specify_categories=["people"] only');
+    await bootScenario(page, { specify_categories: ["people"] }, BASE);
+    s = await snapshot(page);
+    // Allow at most 3 nav buttons:
+    //   - the requested category
+    //   - Frequently Used (show_recents defaults to true; appears once the
+    //     user has picked at least one emoji — see the pick+reopen below)
+    //   - Custom (a custom emoji exists on this forum, see :pianotell:)
+    check(
+      'specify_categories=["people"] → nav has at most 3 buttons',
+      s.navCount >= 1 && s.navCount <= 3,
+      `navCount=${s.navCount} labels=${JSON.stringify(s.navLabels)}`
+    );
+    check(
+      'specify_categories=["people"] → only Smileys/People (and maybe Frequent/Custom) remain',
+      s.navLabels.some((l) => /smileys|people/i.test(l)) &&
+        !s.navLabels.some((l) => /flag/i.test(l)),
+      `labels=${JSON.stringify(s.navLabels)}`
+    );
+    // Frequently Used starts empty (no prepopulated defaults), so the tab is
+    // absent until a pick. Pick a People emoji, reopen, and confirm the tab
+    // now appears — regression-guarding the fix that prepends 'frequent' to
+    // the allow-list (without it, emoji-mart silently drops the tab even with
+    // stored frequents).
+    await pickFirstEmoji(page);
+    await page.goto(BASE, { waitUntil: "networkidle" });
+    await openComposer(page);
+    await openPicker(page);
+    s = await snapshot(page);
+    check(
+      "show_recents (default) + a picked emoji → Frequently Used tab present",
+      s.navLabels.some((l) => /recent|frequent/i.test(l)),
+      `labels=${JSON.stringify(s.navLabels)}`
+    );
 
-  // --- 9. COMBINATION: everything off → bare grid only ---
-  console.log('\n[scenario] all chrome OFF');
-  await bootScenario(page, {
-    specify_categories: DEFAULTS.specify_categories,
-    show_search: false,
-    show_category_buttons: false,
-    show_preview: false,
-    show_variants: false,
-  }, BASE);
-  s = await snapshot(page);
-  check('all-off → no search input', !s.hasSearchInput);
-  check('all-off → no category nav', s.navCount === 0,
-        `navCount=${s.navCount}`);
-  check('all-off → no preview pane', !s.hasPreview);
-  check('all-off → no skin-tone selector', !s.hasSkinToneButton);
+    // --- 9. COMBINATION: everything off → bare grid only ---
+    console.log("\n[scenario] all chrome OFF");
+    await bootScenario(
+      page,
+      {
+        specify_categories: DEFAULTS.specify_categories,
+        show_search: false,
+        show_category_buttons: false,
+        show_preview: false,
+        show_variants: false,
+      },
+      BASE
+    );
+    s = await snapshot(page);
+    check("all-off → no search input", !s.hasSearchInput);
+    check(
+      "all-off → no category nav",
+      s.navCount === 0,
+      `navCount=${s.navCount}`
+    );
+    check("all-off → no preview pane", !s.hasPreview);
+    check("all-off → no skin-tone selector", !s.hasSkinToneButton);
 
-  // --- 10. COMBINATION: search-only ---
-  console.log('\n[scenario] search-only (only show_search=true)');
-  await bootScenario(page, {
-    show_search: true,
-    show_category_buttons: false,
-    show_preview: false,
-    show_variants: false,
-  }, BASE);
-  s = await snapshot(page);
-  check('search-only → search input present', s.hasSearchInput);
-  check('search-only → no category nav', s.navCount === 0,
-        `navCount=${s.navCount}`);
-  check('search-only → no preview pane', !s.hasPreview);
-  check('search-only → no skin-tone selector', !s.hasSkinToneButton);
+    // --- 10. COMBINATION: search-only ---
+    console.log("\n[scenario] search-only (only show_search=true)");
+    await bootScenario(
+      page,
+      {
+        show_search: true,
+        show_category_buttons: false,
+        show_preview: false,
+        show_variants: false,
+      },
+      BASE
+    );
+    s = await snapshot(page);
+    check("search-only → search input present", s.hasSearchInput);
+    check(
+      "search-only → no category nav",
+      s.navCount === 0,
+      `navCount=${s.navCount}`
+    );
+    check("search-only → no preview pane", !s.hasPreview);
+    check("search-only → no skin-tone selector", !s.hasSkinToneButton);
 
-  // --- TEARDOWN: put the forum back to all-on baseline ---
-  console.log('\n[teardown] restoring all-on defaults via admin UI');
-  await restoreDefaults(page, BASE);
-});
+    // --- TEARDOWN: put the forum back to all-on baseline ---
+    console.log("\n[teardown] restoring all-on defaults via admin UI");
+    await restoreDefaults(page, BASE);
+  }
+);

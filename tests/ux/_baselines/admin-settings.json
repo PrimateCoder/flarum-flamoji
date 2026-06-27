@@ -27,10 +27,6 @@
     {
       "label": "Show (and save) frequently used emojis",
       "checked": true
-    },
-    {
-      "label": "Pre-populate with popular emojis",
-      "checked": true
     }
   ],
   "pickerSet": "auto",

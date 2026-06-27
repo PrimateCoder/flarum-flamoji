@@ -164,7 +164,7 @@ const VARIANTS = [
       check('with-custom-emoji — picker visible', snap.visible);
       const hasCustom = snap.navLabels.some((l) => /custom/i.test(l));
       check('with-custom-emoji — Custom category tab present', hasCustom);
-      check('with-custom-emoji — nav has 10+ buttons (9 default + Custom)', snap.navCount >= 10);
+      check('with-custom-emoji — nav has 9+ buttons (8 default + Custom)', snap.navCount >= 9);
     },
   },
   {
@@ -220,7 +220,7 @@ const VARIANTS = [
         snap.navLabels.indexOf('Memes') < snap.navLabels.indexOf('Reactions') &&
           snap.navLabels.indexOf('Reactions') < snap.navLabels.findIndex((l) => /custom/i.test(l)),
         `nav=${JSON.stringify(snap.navLabels)}`);
-      check('with-custom-categories — nav has 12+ buttons (9 default + 2 named + Custom)', snap.navCount >= 12,
+      check('with-custom-categories — nav has 11+ buttons (8 default + 2 named + Custom)', snap.navCount >= 11,
         `navCount=${snap.navCount}`);
     },
   },

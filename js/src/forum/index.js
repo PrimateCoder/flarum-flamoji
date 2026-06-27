@@ -552,7 +552,6 @@ app.initializers.add(
 
       const autoHide = !!app.forum.attribute('flamoji.auto_hide');
       const showRecents = !!app.forum.attribute('flamoji.show_recents');
-      const prepopulateRecents = !!app.forum.attribute('flamoji.prepopulate_recents');
       const showPreview = !!app.forum.attribute('flamoji.show_preview');
       const showSearch = !!app.forum.attribute('flamoji.show_search');
       const showVariants = !!app.forum.attribute('flamoji.show_variants');
@@ -576,10 +575,12 @@ app.initializers.add(
       // Sticker mode only enlarges custom emoji (the unicode set keeps its
       // default size, since those render as fonts/sprites, not <img>). So
       // when it's on, restrict the picker to the custom categories only —
-      // the built-in unicode tabs and Frequent would otherwise sit at normal
-      // size amongst the stickers and just add noise.
+      // the built-in unicode tabs would otherwise sit at normal size amongst
+      // the stickers and just add noise. The Frequently Used tab is exempt:
+      // it stays driven by show_recents exactly like normal mode, so users
+      // keep quick access to their most-used stickers.
       if (effectiveStickerMode) {
-        specifiedCategories = specifiedCategories.filter((id) => id.indexOf('flamoji_custom') === 0);
+        specifiedCategories = specifiedCategories.filter((id) => id === 'frequent' || id.indexOf('flamoji_custom') === 0);
       }
 
       // Match the picker's emoji rendering to what posts will actually
@@ -591,14 +592,18 @@ app.initializers.add(
       const hasEmojiExt = !!app.forum.attribute('flamoji.has_emoji_extension');
       const useTwemoji = pickerSet === 'twemoji' || (pickerSet === 'auto' && hasEmojiExt);
 
-      // When prepopulate is OFF, seed emoji-mart's localStorage with an
-      // empty frequently-used index so it doesn't fall back to its
-      // hardcoded popular-emoji defaults. Once the user picks an emoji,
-      // emoji-mart overwrites this with real data that persists normally.
-      if (showRecents && !prepopulateRecents) {
-        const key = 'emoji-mart.frequently';
-        if (!window.localStorage.getItem(key)) {
-          window.localStorage.setItem(key, JSON.stringify({}));
+      // emoji-mart stores a per-browser Frequently Used index in localStorage
+      // ('emoji-mart.frequently'); when it's ABSENT it falls back to a
+      // hardcoded list of popular *unicode* defaults. Seed an empty index so
+      // those defaults never appear: Frequently Used should reflect the user's
+      // own picks (the standard picker convention), and the generic defaults
+      // are often emoji this picker can't even show (custom-only/sticker mode,
+      // deselected categories). The tab simply appears once the user picks
+      // their first emoji; real picks overwrite this seed normally.
+      if (showRecents) {
+        const FREQUENTLY_KEY = 'emoji-mart.frequently';
+        if (window.localStorage.getItem(FREQUENTLY_KEY) == null) {
+          window.localStorage.setItem(FREQUENTLY_KEY, JSON.stringify({}));
         }
       }
 

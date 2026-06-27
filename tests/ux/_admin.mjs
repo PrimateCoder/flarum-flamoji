@@ -28,7 +28,7 @@
 // admin group (run.sh's provisioner promotes them). The `flarum_remember`
 // cookie carries them through to the admin panel.
 
-const ADMIN_HASH = '#/extension/pianotell-flamoji';
+const ADMIN_HASH = "#/extension/pianotell-flamoji";
 
 // Defaults taken from extend.php so a final `applySettings(page, DEFAULTS)`
 // fully restores the test forum no matter what permutation a spec ran.
@@ -39,33 +39,43 @@ export const DEFAULTS = Object.freeze({
   show_variants: true,
   show_category_buttons: true,
   show_recents: true,
-  prepopulate_recents: true,
   sticker_mode: false,
-  picker_set: 'auto',
+  picker_set: "auto",
   frequent_rows: 4,
   // All eight categories enabled = "no narrowing".
-  specify_categories: ['people', 'nature', 'foods', 'activity', 'places', 'objects', 'symbols', 'flags'],
+  specify_categories: [
+    "people",
+    "nature",
+    "foods",
+    "activity",
+    "places",
+    "objects",
+    "symbols",
+    "flags",
+  ],
 });
 
 // Map setting key → English label as rendered next to the Switch.
 // (The label is the only stable identifier the DOM gives us — the input
 // itself has no name/id.)
 const SWITCH_LABELS = {
-  auto_hide: 'Auto hide',
-  show_preview: 'Show preview section',
-  show_search: 'Show search input',
-  show_variants: 'Show skin-tone variants',
-  sticker_mode: 'Sticker mode',
-  show_category_buttons: 'Show category buttons',
-  show_recents: 'Show (and save) frequently used emojis',
+  auto_hide: "Auto hide",
+  show_preview: "Show preview section",
+  show_search: "Show search input",
+  show_variants: "Show skin-tone variants",
+  sticker_mode: "Sticker mode",
+  show_category_buttons: "Show category buttons",
+  show_recents: "Show (and save) frequently used emojis",
 };
 
 export async function gotoAdmin(page, baseUrl) {
-  const url = baseUrl.replace(/\/$/, '') + '/admin' + ADMIN_HASH;
-  await page.goto(url, { waitUntil: 'networkidle' });
+  const url = baseUrl.replace(/\/$/, "") + "/admin" + ADMIN_HASH;
+  await page.goto(url, { waitUntil: "networkidle" });
   // Wait for the extension settings panel to render.
-  await page.waitForSelector('.Flamoji--settingsContainer', { timeout: 15_000 });
-  await page.waitForSelector('button.Button--primary', { timeout: 5_000 });
+  await page.waitForSelector(".Flamoji--settingsContainer", {
+    timeout: 15_000,
+  });
+  await page.waitForSelector("button.Button--primary", { timeout: 5_000 });
   await page.waitForTimeout(300);
 }
 
@@ -74,13 +84,13 @@ export async function gotoAdmin(page, baseUrl) {
 // flips the checkbox.
 async function setSwitch(page, label, desired) {
   const handle = await page.evaluateHandle((labelText) => {
-    return [...document.querySelectorAll('label.Checkbox--switch')].find(
+    return [...document.querySelectorAll("label.Checkbox--switch")].find(
       (l) => l.textContent?.trim() === labelText
     );
   }, label);
   const el = handle.asElement();
   if (!el) throw new Error(`Switch not found: "${label}"`);
-  const current = await el.evaluate((l) => l.querySelector('input')?.checked);
+  const current = await el.evaluate((l) => l.querySelector("input")?.checked);
   if (current !== desired) await el.click();
   await handle.dispose();
 }
@@ -90,10 +100,10 @@ async function setSelectByValue(page, value) {
   // .value programmatically and dispatching `change` mirrors what the
   // user does (the bound onchange flows through Mithril like normal).
   await page.evaluate((v) => {
-    const sel = document.querySelector('.Flamoji--emojiSetting select');
-    if (!sel) throw new Error('picker_set <select> not found in admin');
+    const sel = document.querySelector(".Flamoji--emojiSetting select");
+    if (!sel) throw new Error("picker_set <select> not found in admin");
     sel.value = v;
-    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
   }, value);
 }
 
@@ -102,31 +112,34 @@ async function setNumberInput(page, selector, value) {
   // Trigger Mithril's bidi binding by dispatching `input`+`change`.
   await page.evaluate((sel) => {
     const el = document.querySelector(sel);
-    el?.dispatchEvent(new Event('input', { bubbles: true }));
-    el?.dispatchEvent(new Event('change', { bubbles: true }));
+    el?.dispatchEvent(new Event("input", { bubbles: true }));
+    el?.dispatchEvent(new Event("change", { bubbles: true }));
   }, selector);
 }
 
 async function setCategories(page, wantedList) {
   const wanted = new Set(wantedList);
-  await page.evaluate((wantedArr) => {
-    const want = new Set(wantedArr);
-    const boxes = [...document.querySelectorAll('.cat-checkbox')];
-    for (const box of boxes) {
-      const input = box.querySelector('input[type="checkbox"]');
-      const cat = box.querySelector('label')?.getAttribute('for');
-      if (!input || !cat) continue;
-      const desired = want.has(cat);
-      if (input.checked !== desired) {
-        // .click() toggles + fires click+change per spec, but be belt-
-        // and-braces: the onchange in admin/index.js mutates this.
-        // specifiedCategories from change.target.checked, and Mithril's
-        // auto-redraw needs the change event to bubble through Mithril's
-        // event delegation. .click() handles both.
-        input.click();
+  await page.evaluate(
+    (wantedArr) => {
+      const want = new Set(wantedArr);
+      const boxes = [...document.querySelectorAll(".cat-checkbox")];
+      for (const box of boxes) {
+        const input = box.querySelector('input[type="checkbox"]');
+        const cat = box.querySelector("label")?.getAttribute("for");
+        if (!input || !cat) continue;
+        const desired = want.has(cat);
+        if (input.checked !== desired) {
+          // .click() toggles + fires click+change per spec, but be belt-
+          // and-braces: the onchange in admin/index.js mutates this.
+          // specifiedCategories from change.target.checked, and Mithril's
+          // auto-redraw needs the change event to bubble through Mithril's
+          // event delegation. .click() handles both.
+          input.click();
+        }
       }
-    }
-  }, [...wanted]);
+    },
+    [...wanted]
+  );
 }
 
 // Apply a partial overrides map. Anything you omit keeps its current
@@ -148,35 +161,34 @@ export async function applySettings(page, overrides, baseUrl) {
   // Dismiss any leftover alert/dialog from previous scenarios so a
   // stale "Oops!" banner doesn't make us think THIS save failed.
   await page.evaluate(() => {
-    document.querySelectorAll('.Alert .Alert-controls .Button').forEach((b) => b.click());
+    document
+      .querySelectorAll(".Alert .Alert-controls .Button")
+      .forEach((b) => b.click());
   });
 
   for (const [key, label] of Object.entries(SWITCH_LABELS)) {
     if (key in overrides) await setSwitch(page, label, !!overrides[key]);
   }
-  if ('picker_set' in overrides) await setSelectByValue(page, overrides.picker_set);
-  if ('prepopulate_recents' in overrides) {
-    // Only renders when show_recents is ON. Skip if show_recents is
-    // being turned OFF in this same call (the switch won't be in the DOM).
-    const recentsOn = 'show_recents' in overrides ? !!overrides.show_recents : true;
-    if (recentsOn) {
-      await page.waitForTimeout(200);
-      await setSwitch(page, 'Pre-populate with popular emojis', !!overrides.prepopulate_recents);
-    }
-  }
-  if ('frequent_rows' in overrides) {
+  if ("picker_set" in overrides)
+    await setSelectByValue(page, overrides.picker_set);
+  if ("frequent_rows" in overrides) {
     // The Frequent emoji rows input only renders when show_recents is
     // ON. Caller's responsibility to ensure that — we don't toggle it
     // implicitly because that would mask a buggy admin UI.
-    await setNumberInput(page, '.recentsCountGroup input[type="number"]', overrides.frequent_rows);
+    await setNumberInput(
+      page,
+      '.recentsCountGroup input[type="number"]',
+      overrides.frequent_rows
+    );
   }
-  if ('specify_categories' in overrides) await setCategories(page, overrides.specify_categories);
+  if ("specify_categories" in overrides)
+    await setCategories(page, overrides.specify_categories);
 
   // Wait briefly for Mithril to redraw the Save button's disabled state.
   await page.waitForTimeout(250);
   const dirty = await page.evaluate(() => {
-    const btn = [...document.querySelectorAll('button')].find(
-      (b) => /save changes/i.test(b.textContent || '')
+    const btn = [...document.querySelectorAll("button")].find((b) =>
+      /save changes/i.test(b.textContent || "")
     );
     return btn && !btn.disabled;
   });
@@ -190,14 +202,16 @@ export async function applySettings(page, overrides, baseUrl) {
   const saveOnce = async () => {
     await page.evaluate(() => {
       // Wipe any prior alert so we can detect a fresh one this round.
-      document.querySelectorAll('.Alert').forEach((a) => a.remove());
+      document.querySelectorAll(".Alert").forEach((a) => a.remove());
     });
-    await page.click('button.Button--primary:not([disabled])', { timeout: 5_000 });
+    await page.click("button.Button--primary:not([disabled])", {
+      timeout: 5_000,
+    });
     try {
       await page.waitForFunction(
         () => {
-          const btn = [...document.querySelectorAll('button')].find(
-            (b) => /save changes/i.test(b.textContent || '')
+          const btn = [...document.querySelectorAll("button")].find((b) =>
+            /save changes/i.test(b.textContent || "")
           );
           return btn && btn.disabled;
         },
@@ -214,7 +228,7 @@ export async function applySettings(page, overrides, baseUrl) {
     // retry once more before declaring failure.
     await page.waitForTimeout(1_500);
     if (!(await saveOnce())) {
-      throw new Error('admin Save Changes did not complete after 2 attempts');
+      throw new Error("admin Save Changes did not complete after 2 attempts");
     }
   }
   await page.waitForTimeout(200);
@@ -234,9 +248,11 @@ export async function restoreDefaults(page, baseUrl) {
 export async function listCustomEmojiShortcodes(page) {
   return await page.evaluate(() =>
     [
-      ...document.querySelectorAll('.customEmoji-list li .customEmoji:not(.addEmoji) .customEmoji-image'),
+      ...document.querySelectorAll(
+        ".customEmoji-list li .customEmoji:not(.addEmoji) .customEmoji-image"
+      ),
     ]
-      .map((img) => img.getAttribute('title'))
+      .map((img) => img.getAttribute("title"))
       .filter(Boolean)
   );
 }
@@ -251,18 +267,21 @@ export async function listCustomEmojiShortcodes(page) {
 //
 // Field order follows the EditEmojiModal ItemList priorities:
 //   0 = title (50), 1 = shortcode (40), 2 = category (35), 3 = path (30).
-export async function addCustomEmoji(page, { title, shortcode, path, category }) {
-  await page.click('.customEmoji-addButton');
-  await page.waitForSelector('.EditEmojiModal', { timeout: 10_000 });
+export async function addCustomEmoji(
+  page,
+  { title, shortcode, path, category }
+) {
+  await page.click(".customEmoji-addButton");
+  await page.waitForSelector(".EditEmojiModal", { timeout: 10_000 });
 
   for (const [idx, value] of [
     [0, title],
     [1, shortcode],
-    [2, category ?? ''],
+    [2, category ?? ""],
     [3, path],
   ]) {
     const input = await page.evaluateHandle((i) => {
-      return document.querySelectorAll('.EditEmojiModal .FormControl')[i];
+      return document.querySelectorAll(".EditEmojiModal .FormControl")[i];
     }, idx);
     const el = input.asElement();
     if (!el) throw new Error(`EditEmojiModal input #${idx} not found`);
@@ -270,16 +289,15 @@ export async function addCustomEmoji(page, { title, shortcode, path, category })
     await el.dispose();
   }
 
-  await page.click('.EditEmojiModal-save');
+  await page.click(".EditEmojiModal-save");
   // Modal closes on success; list re-renders with the new row.
-  await page.waitForFunction(
-    () => !document.querySelector('.EditEmojiModal'),
-    { timeout: 15_000 }
-  );
+  await page.waitForFunction(() => !document.querySelector(".EditEmojiModal"), {
+    timeout: 15_000,
+  });
   await page.waitForFunction(
     (sc) =>
-      [...document.querySelectorAll('.customEmoji-image')].some(
-        (img) => img.getAttribute('title') === sc
+      [...document.querySelectorAll(".customEmoji-image")].some(
+        (img) => img.getAttribute("title") === sc
       ),
     shortcode,
     { timeout: 10_000 }
@@ -291,31 +309,30 @@ export async function addCustomEmoji(page, { title, shortcode, path, category })
 // Returns false if no row matches.
 export async function deleteCustomEmojiByShortcode(page, shortcode) {
   const found = await page.evaluate((sc) => {
-    const img = [...document.querySelectorAll('.customEmoji-image')].find(
-      (i) => i.getAttribute('title') === sc
+    const img = [...document.querySelectorAll(".customEmoji-image")].find(
+      (i) => i.getAttribute("title") === sc
     );
     if (!img) return false;
-    const li = img.closest('li');
-    li?.querySelector('.customEmoji-editButton')?.click();
+    const li = img.closest("li");
+    li?.querySelector(".customEmoji-editButton")?.click();
     return true;
   }, shortcode);
   if (!found) return false;
 
-  await page.waitForSelector('.EditEmojiModal-delete', { timeout: 10_000 });
+  await page.waitForSelector(".EditEmojiModal-delete", { timeout: 10_000 });
 
   // EditEmojiModal.delete() uses native window.confirm — auto-accept.
   // Register the handler before the click so we don't miss it.
-  page.once('dialog', (d) => d.accept());
-  await page.click('.EditEmojiModal-delete');
+  page.once("dialog", (d) => d.accept());
+  await page.click(".EditEmojiModal-delete");
 
-  await page.waitForFunction(
-    () => !document.querySelector('.EditEmojiModal'),
-    { timeout: 15_000 }
-  );
+  await page.waitForFunction(() => !document.querySelector(".EditEmojiModal"), {
+    timeout: 15_000,
+  });
   await page.waitForFunction(
     (sc) =>
-      ![...document.querySelectorAll('.customEmoji-image')].some(
-        (i) => i.getAttribute('title') === sc
+      ![...document.querySelectorAll(".customEmoji-image")].some(
+        (i) => i.getAttribute("title") === sc
       ),
     shortcode,
     { timeout: 10_000 }

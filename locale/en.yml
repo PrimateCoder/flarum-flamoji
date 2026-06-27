@@ -23,9 +23,7 @@ pianotell-flamoji:
       show_search_label: Show search input
       show_search_text: Show the search box at the top of the picker.
       show_recents_label: Show (and save) frequently used emojis
-      show_recents_text: Show the Frequently Used tab at the top of the picker. Each user's frequents are saved in their own browser only.
-      prepopulate_recents_label: Pre-populate with popular emojis
-      prepopulate_recents_text: When enabled, the Frequently Used section shows a default set of popular emojis before the user has picked any. When disabled, the section starts empty and fills as the user selects emojis.
+      show_recents_text: Show the Frequently Used tab at the top of the picker. It starts empty and fills as each member picks emojis. Each user's frequents are saved in their own browser only.
       frequent_rows_label: Frequent emoji rows
       frequent_rows_text: Number of rows of recently/frequently used emojis to display at the top of the picker (1-10).
       picker_set_label: Emoji style

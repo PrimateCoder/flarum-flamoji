@@ -4,7 +4,6 @@
   "hasPreview": true,
   "hasSkinToneButton": true,
   "navLabels": [
-    "Frequently Used",
     "Smileys & People",
     "Animals & Nature",
     "Food & Drink",
@@ -17,7 +16,7 @@
     "Reactions",
     "Custom"
   ],
-  "navCount": 12,
+  "navCount": 11,
   "tileSize": 36,
   "firstTileHasSpriteBackground": true
 }
