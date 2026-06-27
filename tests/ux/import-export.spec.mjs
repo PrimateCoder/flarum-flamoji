@@ -138,18 +138,19 @@ await runSpec({
     toCleanupShortcodes.push(IMPORT_FIXTURE_SHORTCODE);
 
     // The import handler chain is: FileReader → POST /flamojis/import →
-    // 204 → clearCache (DELETE /api/cache) → window.location.reload().
-    // clearCache can 409 under load, breaking the chain. Rather than
-    // relying on the auto-reload, wait for the POST to complete via
-    // network interception, then force-navigate to admin ourselves.
-    // Register the response listener BEFORE setFiles triggers the chain.
+    // 200 {legacyShortcodes:[...]} → clearCache (DELETE /api/cache) →
+    // window.location.reload(). clearCache can 409 under load, breaking the
+    // chain. Rather than relying on the auto-reload, wait for the POST to
+    // complete via network interception, then force-navigate to admin
+    // ourselves. Register the response listener BEFORE setFiles triggers
+    // the chain.
     const importResponse = page.waitForResponse(
       resp => resp.url().includes('/flamojis/import'),
       { timeout: 15_000 }
     );
     await filechooser.setFiles(importPath);
     const resp = await importResponse;
-    check('import POST succeeded', resp.status() === 204, `status=${resp.status()}`);
+    check('import POST succeeded', resp.status() === 200, `status=${resp.status()}`);
 
     await page.waitForTimeout(2000);
     // Force a full reload to clear any stale app.store state
