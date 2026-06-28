@@ -12,7 +12,7 @@ use Flarum\Http\RequestUtil;
 use PianoTell\Flamoji\Commands\ImportEmoji;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\Arr;
-use Laminas\Diactoros\Response\EmptyResponse;
+use Laminas\Diactoros\Response\JsonResponse;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
@@ -33,10 +33,13 @@ class ImportEmojiController implements RequestHandlerInterface
     {
         RequestUtil::getActor($request)->assertAdmin();
 
-        $this->bus->dispatch(
+        // The handler returns the non-canonical ("legacy") shortcodes that
+        // were imported as-is, so the admin UI can surface a non-blocking
+        // notice. Older clients ignore the body.
+        $legacyShortcodes = $this->bus->dispatch(
             new ImportEmoji(Arr::get($request->getParsedBody(), 'data', []))
         );
 
-        return new EmptyResponse(204);
+        return new JsonResponse(['legacyShortcodes' => $legacyShortcodes], 200);
     }
 }

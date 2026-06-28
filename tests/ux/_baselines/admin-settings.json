@@ -17,15 +17,15 @@
       "checked": true
     },
     {
+      "label": "Sticker mode",
+      "checked": false
+    },
+    {
       "label": "Show category buttons",
       "checked": true
     },
     {
       "label": "Show (and save) frequently used emojis",
-      "checked": true
-    },
-    {
-      "label": "Pre-populate with popular emojis",
       "checked": true
     }
   ],

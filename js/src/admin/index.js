@@ -115,6 +115,17 @@ app.initializers.add('pianotell-flamoji', (app) => {
           </div>
           <div className="Flamoji--emojiSetting">
             <div className="Form-group">
+              <Switch
+                state={!!this.setting(['pianotell-flamoji.sticker_mode'])() && this.setting(['pianotell-flamoji.sticker_mode'])() !== '0'}
+                onchange={this.settings['pianotell-flamoji.sticker_mode']}
+              >
+                {app.translator.trans('pianotell-flamoji.admin.settings.sticker_mode_label')}
+              </Switch>
+            </div>
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.sticker_mode_text')}</div>
+          </div>
+          <div className="Flamoji--emojiSetting">
+            <div className="Form-group">
               <label>{app.translator.trans('pianotell-flamoji.admin.settings.picker_set_label')}</label>
               <Select
                 value={this.setting(['pianotell-flamoji.picker_set'])() || 'auto'}
@@ -158,19 +169,6 @@ app.initializers.add('pianotell-flamoji', (app) => {
             </div>
             <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.show_recents_text')}</div>
           </div>
-          {!!this.setting(['pianotell-flamoji.show_recents'])() && this.setting(['pianotell-flamoji.show_recents'])() !== '0' && (
-            <div className="Flamoji--categorySetting prepopulateRecentsSetting">
-              <div className="Form-group">
-                <Switch
-                  state={!!this.setting(['pianotell-flamoji.prepopulate_recents'])() && this.setting(['pianotell-flamoji.prepopulate_recents'])() !== '0'}
-                  onchange={this.settings['pianotell-flamoji.prepopulate_recents']}
-                >
-                  {app.translator.trans('pianotell-flamoji.admin.settings.prepopulate_recents_label')}
-                </Switch>
-              </div>
-              <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.prepopulate_recents_text')}</div>
-            </div>
-          )}
           {!!this.setting(['pianotell-flamoji.show_recents'])() && this.setting(['pianotell-flamoji.show_recents'])() !== '0' && (
             <div className="Flamoji--categorySetting recentsCountSetting">
               <div className="Form-group recentsCountGroup">

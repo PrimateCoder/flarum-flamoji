@@ -14,9 +14,34 @@ import EditEmojiModal from './EditEmojiModal';
 import listItems from 'flarum/common/helpers/listItems';
 import ItemList from 'flarum/common/utils/ItemList';
 
+// sessionStorage key used to carry a post-import notice across the page
+// reload that import triggers.
+const IMPORT_NOTICE_KEY = 'flamoji.importLegacyShortcodes';
+
 export default class CustomEmojiSection extends Component {
   oninit(vnode) {
     super.oninit(vnode);
+
+    // If a prior import (which reloads the page) flagged legacy shortcodes,
+    // surface a non-blocking warning now that we've reloaded.
+    try {
+      const stashed = sessionStorage.getItem(IMPORT_NOTICE_KEY);
+      if (stashed) {
+        sessionStorage.removeItem(IMPORT_NOTICE_KEY);
+        const legacy = JSON.parse(stashed);
+        if (Array.isArray(legacy) && legacy.length) {
+          app.alerts.show(
+            { type: 'warning' },
+            app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.import_legacy_shortcodes', {
+              count: legacy.length,
+              shortcodes: legacy.join(', '),
+            })
+          );
+        }
+      }
+    } catch (e) {
+      // sessionStorage / JSON failures are non-fatal — skip the notice.
+    }
   }
 
   exportEmojiList() {
@@ -29,6 +54,7 @@ export default class CustomEmojiSection extends Component {
         customEmojiList[i] = {
           title: attr.title,
           text_to_replace: attr.text_to_replace,
+          category: attr.category,
           path: attr.path,
         };
       });
@@ -62,7 +88,16 @@ export default class CustomEmojiSection extends Component {
             url: `${app.forum.attribute('apiUrl')}/pianotell/import-emojis`,
             body: { data: JSON.parse(readerEvent.target.result) },
           })
-          .then(() => {
+          .then((response) => {
+            const legacy = (response && response.legacyShortcodes) || [];
+            if (Array.isArray(legacy) && legacy.length) {
+              // Stash for after the reload below.
+              try {
+                sessionStorage.setItem(IMPORT_NOTICE_KEY, JSON.stringify(legacy));
+              } catch (e) {
+                // non-fatal
+              }
+            }
             EditEmojiModal.prototype.clearCache().then(() => window.location.reload());
           });
       };

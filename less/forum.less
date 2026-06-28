@@ -27,10 +27,30 @@ em-emoji-picker.flamoji-picker-popup {
   --flamoji-category-header-color: @muted-color;
 }
 
+// Sticker mode: give the picker a responsive width/height so emoji-mart's
+// dynamicWidth computes perLine from it, and the popup stays mobile-friendly
+// (caps to the viewport on small screens). The loader uses the same footprint
+// (see .flamoji-picker-loader--sticker) so the swap isn't a size jump.
+@flamoji-sticker-width: ~"min(400px, calc(100vw - 16px))";
+@flamoji-sticker-height: ~"min(540px, calc(100vh - 140px))";
+
+em-emoji-picker.flamoji-picker-popup--sticker {
+  width: @flamoji-sticker-width;
+  height: @flamoji-sticker-height;
+}
+
 span.flamoji img {
   height: 1.5em;
   margin: 0 0.1em;
   vertical-align: -0.3em;
+}
+
+// Sticker mode (admin toggle, flamoji.sticker_mode): render custom emoji at
+// sticker size in posts and the live composer preview, matching the enlarged
+// picker grid. Keyed on the root class set by forum/index.js's initializer.
+html.flamoji--sticker span.flamoji img {
+  height: 4em;
+  vertical-align: middle;
 }
 
 // Placeholder popup shown while emoji-mart chunks + the custom-emoji API
@@ -56,6 +76,13 @@ span.flamoji img {
   .box-shadow(0 2px 6px @shadow-color);
   font-size: 14px;
   text-align: center;
+
+  // Sticker mode: match the responsive sticker picker footprint so the
+  // placeholder doesn't jump in size when the real picker mounts.
+  &--sticker {
+    width: @flamoji-sticker-width;
+    min-height: @flamoji-sticker-height;
+  }
 
   &__spinner {
     width: 36px;

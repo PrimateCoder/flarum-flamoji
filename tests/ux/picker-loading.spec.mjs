@@ -8,6 +8,7 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runSpec, openComposer } from '../../.pianotell/tests/ux/helpers.mjs';
+import { applySettings, DEFAULTS } from './_admin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -40,6 +41,11 @@ await runSpec({
   specName: 'picker-loading',
   outputDir: HERE,
 }, async ({ context, page, check, BASE }) => {
+  // Ensure default sizing — the sub-pixel nav guard check below assumes the
+  // default grid; sticker mode (80px tiles) would legitimately exceed it.
+  console.log('\n[setup] applying defaults (sticker mode off)');
+  await applySettings(page, DEFAULTS, BASE);
+
   // ---------------------------------------------------------------
   // Phase 1: Loader appears while picker is loading; vanishes after.
   // ---------------------------------------------------------------
@@ -47,12 +53,12 @@ await runSpec({
   // emoji-mart chunks themselves are cached after first run so we can't
   // count on them being slow; delaying the API gives a deterministic
   // window in which the loader must be visible.
-  await page.route('**/api/pianotell/emojis*', async (route) => {
+  await page.route('**/api/pianotell/emojis**', async (route) => {
     await new Promise((r) => setTimeout(r, 1500));
     await route.continue();
   });
 
-  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+  await page.goto(BASE, { waitUntil: 'networkidle' });
   await openComposer(page);
   await clickPickerButton(page);
 
@@ -106,7 +112,7 @@ await runSpec({
   );
 
   // Drop the throttle for the next phase.
-  await page.unroute('**/api/pianotell/emojis*');
+  await page.unroute('**/api/pianotell/emojis**');
 
   // ---------------------------------------------------------------
   // Phase 2: Loader swaps to error state when API fails. Retry works.
@@ -116,7 +122,7 @@ await runSpec({
   const page2 = await context.newPage();
 
   let blockApi = true;
-  await page2.route('**/api/pianotell/emojis*', async (route) => {
+  await page2.route('**/api/pianotell/emojis**', async (route) => {
     if (blockApi) {
       await route.fulfill({ status: 500, body: 'forced failure' });
     } else {
@@ -163,7 +169,7 @@ await runSpec({
   const afterRetry = await snapshotLoader(page2);
   check('loader is removed after successful Retry', !afterRetry.present);
 
-  await page2.unroute('**/api/pianotell/emojis*');
+  await page2.unroute('**/api/pianotell/emojis**');
   await page2.close();
 
   // ---------------------------------------------------------------
@@ -172,7 +178,7 @@ await runSpec({
   // isPickerLoading is true, but verify the user-visible invariant).
   // ---------------------------------------------------------------
   const page3 = await context.newPage();
-  await page3.route('**/api/pianotell/emojis*', async (route) => {
+  await page3.route('**/api/pianotell/emojis**', async (route) => {
     await new Promise((r) => setTimeout(r, 1500));
     await route.continue();
   });
@@ -198,7 +204,7 @@ await runSpec({
   await page3.waitForSelector('em-emoji-picker.flamoji-picker-popup', {
     timeout: 15_000,
   });
-  await page3.unroute('**/api/pianotell/emojis*');
+  await page3.unroute('**/api/pianotell/emojis**');
   await page3.close();
 
   // ---------------------------------------------------------------
@@ -207,7 +213,7 @@ await runSpec({
   // the toolbar button if the page scrolls under it during the load.
   // ---------------------------------------------------------------
   const page4 = await context.newPage();
-  await page4.route('**/api/pianotell/emojis*', async (route) => {
+  await page4.route('**/api/pianotell/emojis**', async (route) => {
     await new Promise((r) => setTimeout(r, 2500));
     await route.continue();
   });
@@ -238,7 +244,7 @@ await runSpec({
     afterResize !== beforeScroll,
     `before=${beforeScroll} after=${afterResize}`
   );
-  await page4.unroute('**/api/pianotell/emojis*');
+  await page4.unroute('**/api/pianotell/emojis**');
   await page4.close();
 
   // ---------------------------------------------------------------
@@ -247,7 +253,7 @@ await runSpec({
   // already-mounted loader; otherwise we'd leak DOM into document.body.
   // ---------------------------------------------------------------
   const page5 = await context.newPage();
-  await page5.route('**/api/pianotell/emojis*', async (route) => {
+  await page5.route('**/api/pianotell/emojis**', async (route) => {
     await new Promise((r) => setTimeout(r, 3000));
     await route.continue();
   });
@@ -258,7 +264,7 @@ await runSpec({
   // Close composer (Esc key, then click any "discard" confirmation).
   // Flarum's TextEditor unmount fires our onremove which should clean up.
   await page5.evaluate(() => {
-    // app.composer is the global composer state on Flarum 1.x.
+    // app.composer is the global composer state on Flarum.
     if (window.app && window.app.composer && window.app.composer.isVisible()) {
       window.app.composer.hide();
     }
@@ -272,7 +278,7 @@ await runSpec({
     orphan === 0,
     `found ${orphan} orphaned loader element(s) after composer close`
   );
-  await page5.unroute('**/api/pianotell/emojis*');
+  await page5.unroute('**/api/pianotell/emojis**');
   await page5.close();
 
   // ---------------------------------------------------------------

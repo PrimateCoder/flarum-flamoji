@@ -34,16 +34,26 @@ class ConfigureTextFormatter
         $customEmojis = Emoji::all();
 
         foreach ($customEmojis as $emoji) {
-            $path = $emoji->path;
+            $path = (string) $emoji->path;
+            $trigger = (string) $emoji->text_to_replace;
 
-            // check if the path starts with http:// or https://
-            // We're using a similar thing on the urlChecker.js
-            if (!preg_match('/http(s?)\:\/\//i', $path)) {
+            // Skip incomplete rows: a blank trigger or path would register a
+            // broken/zero-width emoticon (and a blank trigger could match
+            // unexpectedly across posts).
+            if ($trigger === '' || $path === '') {
+                continue;
+            }
+
+            // Anchor the absolute-URL check to the start of the string
+            // (mirrors urlChecker.js). An unanchored match would treat a
+            // forum-relative path that merely contains "http://" later
+            // (e.g. a query string) as absolute and skip prefixing.
+            if (!preg_match('/^https?:\/\//i', $path)) {
                 $path = $this->url->to('forum')->base() . $path;
             }
 
             $config->Emoticons->add(
-                $emoji->text_to_replace,
+                $trigger,
                 '
                     <span class="flamoji">
                         <img src="' . htmlspecialchars($path, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '" alt="' . htmlspecialchars((string) $emoji->title, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '" />

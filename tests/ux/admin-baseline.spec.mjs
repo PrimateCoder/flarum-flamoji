@@ -10,7 +10,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runSpec, compareScreenshot } from '../../.pianotell/tests/ux/helpers.mjs';
-import { applySettings, DEFAULTS, gotoAdmin } from './_admin.mjs';
+import { applySettings, DEFAULTS, gotoAdmin, deleteAllCustomEmojis, addCustomEmoji } from './_admin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASELINES = resolve(HERE, '_baselines');
@@ -23,6 +23,21 @@ await runSpec({
   // Ensure defaults
   console.log('\n[setup] restoring defaults');
   await applySettings(page, DEFAULTS, BASE);
+
+  // Reset the custom-emoji list to exactly one deterministic fixture so
+  // both the structural `customEmojiCount` and the custom-emoji-section
+  // pixel baseline are reproducible regardless of ambient DB state (other
+  // specs in the suite add/remove custom emoji). Uses a pinned CDN image
+  // so it renders identically in CI.
+  console.log('[setup] resetting custom emoji to a single fixture');
+  await gotoAdmin(page, BASE);
+  await deleteAllCustomEmojis(page, BASE);
+  await gotoAdmin(page, BASE);
+  await addCustomEmoji(page, {
+    title: 'Baseline Fixture',
+    shortcode: ':flamoji_admin_fixture:',
+    path: 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/64/1f600.png',
+  });
   await gotoAdmin(page, BASE);
 
   // ---- Structural snapshot of admin settings ----
@@ -96,6 +111,10 @@ await runSpec({
 
   // ---- Pixel baseline of settings panel ----
   console.log('\n[pixel] capturing admin settings panel');
+  // Scroll to top so the settings container is fully visible below the
+  // fixed admin header.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(500);
   const settingsBox = await page.evaluate(() => {
     const el = document.querySelector('.Flamoji--settingsContainer');
     if (!el) return null;

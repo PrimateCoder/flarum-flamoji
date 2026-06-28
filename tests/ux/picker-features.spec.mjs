@@ -14,6 +14,7 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runSpec, openComposer } from '../../.pianotell/tests/ux/helpers.mjs';
+import { applySettings, DEFAULTS } from './_admin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -128,6 +129,10 @@ await runSpec({
   outputDir: HERE,
 }, async ({ page, check, BASE }) => {
   await page.context().setExtraHTTPHeaders({ 'cache-control': 'no-cache' });
+  // Apply defaults first — this spec asserts the full built-in category set
+  // is present, which sticker mode (custom-only) would otherwise hide.
+  console.log('[setup] applying defaults (sticker mode off)');
+  await applySettings(page, DEFAULTS, BASE);
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await openComposer(page);
   await openPicker(page);
