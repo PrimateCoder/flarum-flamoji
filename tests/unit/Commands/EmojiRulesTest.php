@@ -21,7 +21,82 @@ class EmojiRulesTest extends TestCase
             'title' => 'My Title',
             'text_to_replace' => ':wave:',
             'path' => 'https://cdn/wave.png',
+            'category' => null,
         ], $result);
+    }
+
+    /** @test */
+    public function validate_create_trims_category_and_keeps_value(): void
+    {
+        $result = EmojiRules::validateCreate([
+            'text_to_replace' => ':x:',
+            'path' => '/x.png',
+            'category' => '  Memes  ',
+        ]);
+
+        $this->assertSame('Memes', $result['category']);
+    }
+
+    /** @test */
+    public function validate_create_normalizes_blank_category_to_null(): void
+    {
+        $result = EmojiRules::validateCreate([
+            'text_to_replace' => ':x:',
+            'path' => '/x.png',
+            'category' => '   ',
+        ]);
+
+        $this->assertNull($result['category']);
+    }
+
+    /** @test */
+    public function validate_create_rejects_overlong_category(): void
+    {
+        try {
+            EmojiRules::validateCreate([
+                'text_to_replace' => ':x:',
+                'path' => '/x.png',
+                'category' => str_repeat('a', 256),
+            ]);
+            $this->fail('Expected ValidationException for overlong category');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('category', $e->getAttributes());
+        }
+    }
+
+    /** @test */
+    public function validate_category_accepts_max_length_and_rejects_over(): void
+    {
+        $this->assertNull(EmojiRules::validateCategory(str_repeat('a', 255)));
+        $this->assertNotNull(EmojiRules::validateCategory(str_repeat('a', 256)));
+    }
+
+    /** @test */
+    public function is_canonical_shortcode_accepts_colon_wrapped_safe_chars(): void
+    {
+        $this->assertTrue(EmojiRules::isCanonicalShortcode(':wave:'));
+        $this->assertTrue(EmojiRules::isCanonicalShortcode(':myemoji_partyparrot:'));
+        $this->assertTrue(EmojiRules::isCanonicalShortcode(':a-b:'));
+        $this->assertTrue(EmojiRules::isCanonicalShortcode(':+1:'));
+        $this->assertTrue(EmojiRules::isCanonicalShortcode(':AB12:'));
+    }
+
+    /** @test */
+    public function is_canonical_shortcode_rejects_non_canonical_values(): void
+    {
+        $this->assertFalse(EmojiRules::isCanonicalShortcode('png'));
+        $this->assertFalse(EmojiRules::isCanonicalShortcode(':wave'));
+        $this->assertFalse(EmojiRules::isCanonicalShortcode('wave:'));
+        $this->assertFalse(EmojiRules::isCanonicalShortcode('::'));
+        $this->assertFalse(EmojiRules::isCanonicalShortcode(':wave!:'));
+        $this->assertFalse(EmojiRules::isCanonicalShortcode(':https://x:'));
+    }
+
+    /** @test */
+    public function validate_canonical_shortcode_returns_error_only_for_non_canonical(): void
+    {
+        $this->assertNull(EmojiRules::validateCanonicalShortcode(':wave:'));
+        $this->assertNotNull(EmojiRules::validateCanonicalShortcode('png'));
     }
 
     /** @test */

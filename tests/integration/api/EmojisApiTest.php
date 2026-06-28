@@ -106,6 +106,56 @@ class EmojisApiTest extends TestCase
     }
 
     /** @test */
+    public function create_endpoint_persists_category_for_admin(): void
+    {
+        $response = $this->send($this->request('POST', '/api/pianotell/emojis', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => [
+                'title' => 'Doge',
+                'text_to_replace' => ':doge:',
+                'path' => '/doge.png',
+                'category' => '  Memes  ',
+            ]]],
+        ]));
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $this->assertSame('Memes', Emoji::where('text_to_replace', ':doge:')->first()->category);
+    }
+
+    /** @test */
+    public function create_endpoint_rejects_non_canonical_shortcode(): void
+    {
+        $response = $this->send($this->request('POST', '/api/pianotell/emojis', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => [
+                'title' => 'Bare',
+                'text_to_replace' => 'png',
+                'path' => '/png.png',
+            ]]],
+        ]));
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertFalse(Emoji::where('text_to_replace', 'png')->exists());
+    }
+
+    /** @test */
+    public function create_endpoint_rejects_duplicate_trigger(): void
+    {
+        // :wave: is already seeded (id 1).
+        $response = $this->send($this->request('POST', '/api/pianotell/emojis', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => [
+                'title' => 'Dupe',
+                'text_to_replace' => ':wave:',
+                'path' => '/dupe.png',
+            ]]],
+        ]));
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertSame(1, Emoji::where('text_to_replace', ':wave:')->count());
+    }
+
+    /** @test */
     public function create_endpoint_returns_422_on_validation_failure(): void
     {
         $response = $this->send($this->request('POST', '/api/pianotell/emojis', [
@@ -137,6 +187,80 @@ class EmojisApiTest extends TestCase
         $this->assertSame('Renamed Wave', $emoji->title);
         $this->assertSame(':hi:', $emoji->text_to_replace);
         $this->assertSame('/wave.png', $emoji->path); // unchanged
+    }
+
+    /** @test */
+    public function update_endpoint_rejects_duplicate_trigger(): void
+    {
+        // Changing :smile: (id 2) to :wave: (id 1) must be rejected.
+        $response = $this->send($this->request('PATCH', '/api/pianotell/emojis/2', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => ['textToReplace' => ':wave:']]],
+        ]));
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertSame(':smile:', Emoji::find(2)->text_to_replace);
+    }
+
+    /** @test */
+    public function update_endpoint_allows_saving_emoji_with_its_own_unchanged_trigger(): void
+    {
+        $response = $this->send($this->request('PATCH', '/api/pianotell/emojis/1', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => [
+                'title' => 'Wave Renamed',
+                'textToReplace' => ':wave:',
+            ]]],
+        ]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertSame('Wave Renamed', Emoji::find(1)->title);
+    }
+
+    /** @test */
+    public function update_endpoint_enforces_canonical_when_changing_trigger(): void
+    {
+        $response = $this->send($this->request('PATCH', '/api/pianotell/emojis/1', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => ['textToReplace' => 'png']]],
+        ]));
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertSame(':wave:', Emoji::find(1)->text_to_replace);
+    }
+
+    /** @test */
+    public function update_endpoint_grandfathers_legacy_trigger_when_only_title_changes(): void
+    {
+        // Seed a row whose trigger predates the canonical rule (a bare word).
+        $this->send($this->request('GET', '/api/pianotell/emojis'));
+        Emoji::query()->insert([
+            'id' => 99,
+            'title' => 'Legacy',
+            'text_to_replace' => 'legacyword',
+            'path' => '/legacy.png',
+        ]);
+
+        $response = $this->send($this->request('PATCH', '/api/pianotell/emojis/99', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => ['title' => 'Legacy Renamed']]],
+        ]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertSame('Legacy Renamed', Emoji::find(99)->title);
+        $this->assertSame('legacyword', Emoji::find(99)->text_to_replace);
+    }
+
+    /** @test */
+    public function update_endpoint_persists_category(): void
+    {
+        $response = $this->send($this->request('PATCH', '/api/pianotell/emojis/1', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => ['attributes' => ['category' => '  Reactions  ']]],
+        ]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertSame('Reactions', Emoji::find(1)->category);
     }
 
     /** @test */
@@ -195,9 +319,63 @@ class EmojisApiTest extends TestCase
             ]],
         ]));
 
-        $this->assertEquals(204, $response->getStatusCode());
+        $this->assertEquals(200, $response->getStatusCode());
         $this->assertNotNull(Emoji::where('text_to_replace', ':a:')->first());
         $this->assertNotNull(Emoji::where('text_to_replace', ':b:')->first());
+    }
+
+    /** @test */
+    public function import_endpoint_persists_category(): void
+    {
+        $response = $this->send($this->request('POST', '/api/pianotell/import-emojis', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => [
+                ['title' => 'A', 'text_to_replace' => ':a:', 'path' => '/a.png', 'category' => 'Memes'],
+                ['title' => 'B', 'text_to_replace' => ':b:', 'path' => '/b.png'],
+            ]],
+        ]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertSame('Memes', Emoji::where('text_to_replace', ':a:')->first()->category);
+        $this->assertNull(Emoji::where('text_to_replace', ':b:')->first()->category);
+    }
+
+    /** @test */
+    public function import_endpoint_is_tolerant_of_non_canonical_and_reports_them(): void
+    {
+        $response = $this->send($this->request('POST', '/api/pianotell/import-emojis', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => [
+                ['title' => 'Good', 'text_to_replace' => ':good:', 'path' => '/good.png'],
+                ['title' => 'Legacy', 'text_to_replace' => 'bareword', 'path' => '/bare.png'],
+            ]],
+        ]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        // Both persisted (tolerant import).
+        $this->assertNotNull(Emoji::where('text_to_replace', ':good:')->first());
+        $this->assertNotNull(Emoji::where('text_to_replace', 'bareword')->first());
+        // Only the non-canonical trigger is reported.
+        $body = json_decode($response->getBody()->getContents(), true);
+        $this->assertSame(['bareword'], $body['legacyShortcodes']);
+    }
+
+    /** @test */
+    public function import_endpoint_rejects_duplicate_against_existing(): void
+    {
+        // :wave: is already seeded.
+        $this->send($this->request('GET', '/api/pianotell/emojis'));
+        $countBefore = Emoji::count();
+
+        $response = $this->send($this->request('POST', '/api/pianotell/import-emojis', [
+            'authenticatedAs' => 1,
+            'json' => ['data' => [
+                ['title' => 'Dup', 'text_to_replace' => ':wave:', 'path' => '/d.png'],
+            ]],
+        ]));
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertEquals($countBefore, Emoji::count());
     }
 
     /** @test */
