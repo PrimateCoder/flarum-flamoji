@@ -49,6 +49,9 @@ function snapshotPicker(page) {
     const sr = picker.shadowRoot;
     const navLabels = [...sr.querySelectorAll('nav button[aria-label]')]
       .map((b) => b.getAttribute('aria-label'));
+    const firstTileBtn = sr.querySelector('.category button[aria-label]:not([aria-selected])')
+      || sr.querySelector('.category button');
+    const tileSize = firstTileBtn ? Math.round(firstTileBtn.getBoundingClientRect().width) : 0;
     return {
       visible: picker.style.display !== 'none',
       hasSearchInput: !!sr.querySelector('input[type="search"]'),
@@ -56,6 +59,7 @@ function snapshotPicker(page) {
       hasSkinToneButton: !!sr.querySelector('.skin-tone-button'),
       navLabels,
       navCount: navLabels.length,
+      tileSize,
       firstTileHasSpriteBackground:
         !!sr.querySelector('.category button span[style*="background-image"]'),
     };
@@ -160,7 +164,106 @@ const VARIANTS = [
       check('with-custom-emoji — picker visible', snap.visible);
       const hasCustom = snap.navLabels.some((l) => /custom/i.test(l));
       check('with-custom-emoji — Custom category tab present', hasCustom);
-      check('with-custom-emoji — nav has 10+ buttons (9 default + Custom)', snap.navCount >= 10);
+      check('with-custom-emoji — nav has 9+ buttons (8 default + Custom)', snap.navCount >= 9);
+    },
+  },
+  {
+    id: 'with-custom-categories',
+    label: 'custom emoji grouped into named categories',
+    overrides: DEFAULTS,
+    // Seeds custom emoji across two named categories plus one
+    // uncategorized, so the picker nav renders dedicated image-icon tabs
+    // for "Memes" and "Reactions" (alphabetical) followed by the default
+    // "Custom" tab last. Multiple emoji per named category so the captured
+    // screenshot shows a populated custom grid (not just nav icons).
+    // Pinned CDN images keep the pixel baseline stable.
+    setup: async (page, baseUrl) => {
+      const cdn = 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/64';
+      await gotoAdmin(page, baseUrl);
+      await addCustomEmoji(page, { title: 'Party', shortcode: ':flamoji_var_party:', category: 'Memes', path: `${cdn}/1f389.png` });
+      await addCustomEmoji(page, { title: 'Fire', shortcode: ':flamoji_var_fire:', category: 'Memes', path: `${cdn}/1f525.png` });
+      await addCustomEmoji(page, { title: 'Hundred', shortcode: ':flamoji_var_100:', category: 'Memes', path: `${cdn}/1f4af.png` });
+      await addCustomEmoji(page, { title: 'Thumbs Up', shortcode: ':flamoji_var_thumb:', category: 'Reactions', path: `${cdn}/1f44d.png` });
+      await addCustomEmoji(page, { title: 'Heart', shortcode: ':flamoji_var_heart:', category: 'Reactions', path: `${cdn}/2764-fe0f.png` });
+      await addCustomEmoji(page, { title: 'Star', shortcode: ':flamoji_var_star:', path: `${cdn}/2b50.png` });
+    },
+    teardown: async (page, baseUrl) => {
+      await gotoAdmin(page, baseUrl);
+      for (const sc of [
+        ':flamoji_var_party:', ':flamoji_var_fire:', ':flamoji_var_100:',
+        ':flamoji_var_thumb:', ':flamoji_var_heart:', ':flamoji_var_star:',
+      ]) {
+        await deleteCustomEmojiByShortcode(page, sc);
+      }
+    },
+    // Before the pixel capture, click the "Memes" nav tab so the picker
+    // scrolls its custom emoji tiles into view — the baseline then proves
+    // custom emoji actually render in the grid, not just as nav icons.
+    beforeCapture: async (page) => {
+      await page.evaluate(() => {
+        const sr = document.querySelector('em-emoji-picker.flamoji-picker-popup')?.shadowRoot;
+        const memes = [...(sr?.querySelectorAll('nav button[aria-label]') || [])]
+          .find((b) => b.getAttribute('aria-label') === 'Memes');
+        memes?.click();
+      });
+      await page.waitForTimeout(600);
+    },
+    checks: (snap, check) => {
+      check('with-custom-categories — picker visible', snap.visible);
+      check('with-custom-categories — "Memes" tab present', snap.navLabels.includes('Memes'),
+        `nav=${JSON.stringify(snap.navLabels)}`);
+      check('with-custom-categories — "Reactions" tab present', snap.navLabels.includes('Reactions'),
+        `nav=${JSON.stringify(snap.navLabels)}`);
+      check('with-custom-categories — default "Custom" tab present', snap.navLabels.some((l) => /custom/i.test(l)),
+        `nav=${JSON.stringify(snap.navLabels)}`);
+      check('with-custom-categories — named tabs precede Custom (alphabetical, Custom last)',
+        snap.navLabels.indexOf('Memes') < snap.navLabels.indexOf('Reactions') &&
+          snap.navLabels.indexOf('Reactions') < snap.navLabels.findIndex((l) => /custom/i.test(l)),
+        `nav=${JSON.stringify(snap.navLabels)}`);
+      check('with-custom-categories — nav has 11+ buttons (8 default + 2 named + Custom)', snap.navCount >= 11,
+        `navCount=${snap.navCount}`);
+    },
+  },
+  {
+    id: 'sticker-mode',
+    label: 'sticker_mode=true (enlarged, custom-only grid)',
+    overrides: { ...DEFAULTS, sticker_mode: true },
+    // Seed several custom emoji so sticker mode has a populated custom grid
+    // to show (the picker is restricted to custom categories in this mode).
+    // 4+ emoji also satisfies openPicker's ">3 tiles" readiness wait.
+    setup: async (page, baseUrl) => {
+      const cdn = 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/64';
+      await gotoAdmin(page, baseUrl);
+      await addCustomEmoji(page, { title: 'Party', shortcode: ':flamoji_stk_party:', category: 'Memes', path: `${cdn}/1f389.png` });
+      await addCustomEmoji(page, { title: 'Fire', shortcode: ':flamoji_stk_fire:', category: 'Memes', path: `${cdn}/1f525.png` });
+      await addCustomEmoji(page, { title: 'Hundred', shortcode: ':flamoji_stk_100:', category: 'Memes', path: `${cdn}/1f4af.png` });
+      await addCustomEmoji(page, { title: 'Star', shortcode: ':flamoji_stk_star:', category: 'Memes', path: `${cdn}/2b50.png` });
+      await addCustomEmoji(page, { title: 'Rocket', shortcode: ':flamoji_stk_rocket:', category: 'Memes', path: `${cdn}/1f680.png` });
+    },
+    teardown: async (page, baseUrl) => {
+      await gotoAdmin(page, baseUrl);
+      for (const sc of [
+        ':flamoji_stk_party:', ':flamoji_stk_fire:', ':flamoji_stk_100:',
+        ':flamoji_stk_star:', ':flamoji_stk_rocket:',
+      ]) {
+        await deleteCustomEmojiByShortcode(page, sc);
+      }
+    },
+    checks: (snap, check) => {
+      check('sticker-mode — picker visible', snap.visible);
+      // Default tiles are ~36px; sticker mode uses an 80px tile.
+      check('sticker-mode — grid tiles enlarged (>= 70px)', snap.tileSize >= 70,
+        `tileSize=${snap.tileSize}`);
+      // Custom-only: no built-in unicode category (e.g. "Smileys & People",
+      // "Flags") and no "Frequently Used" — just the custom tabs.
+      const BUILTINS = /smileys|people|animals & nature|food|activities|travel|objects|symbols|flags|frequent/i;
+      check('sticker-mode — picker restricted to custom categories',
+        snap.navLabels.length > 0 && !snap.navLabels.some((l) => BUILTINS.test(l)),
+        `nav=${JSON.stringify(snap.navLabels)}`);
+      // Custom emoji have no skin-tone variants, so the skin-tone selector is
+      // suppressed in sticker mode even though show_variants is on (default).
+      check('sticker-mode — no skin-tone selector (custom emoji have no variants)',
+        !snap.hasSkinToneButton);
     },
   },
 ];
@@ -202,6 +305,9 @@ await runSpec({
 
     // Pixel baseline
     const pixelFile = resolve(BASELINES, `picker-${variant.id}.png`);
+    // Optional pre-capture interaction (e.g. scroll a custom category into
+    // view) so the screenshot shows more than the default Frequent tab.
+    if (variant.beforeCapture) await variant.beforeCapture(page);
     const bbox = await capturePicker(page);
     if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
       check(`${variant.id} — has bounding box`, false, `bbox=${JSON.stringify(bbox)}`);

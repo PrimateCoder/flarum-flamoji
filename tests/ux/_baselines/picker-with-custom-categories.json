@@ -11,9 +11,12 @@
     "Travel & Places",
     "Objects",
     "Symbols",
-    "Flags"
+    "Flags",
+    "Memes",
+    "Reactions",
+    "Custom"
   ],
-  "navCount": 8,
+  "navCount": 11,
   "tileSize": 36,
   "firstTileHasSpriteBackground": true
 }

@@ -105,15 +105,18 @@ await runSpec({
     check('export → non-empty (seed emoji present)', exportedRows.length >= 1,
       `got ${exportedRows.length} rows`);
 
-    // ---- 2. Import (round-trip + new row) ----
-    console.log('\n[import] inject one row, import via admin button');
+    // ---- 2. Import (new row only) ----
+    // The 2.x import endpoint rejects the entire batch if any row's
+    // text_to_replace already exists in the DB, so we import ONLY the
+    // new fixture row (not a re-import of the full export).
+    console.log('\n[import] inject one new row, import via admin button');
 
-    const importPayload = { ...exported };
-    const newKey = String(Object.keys(importPayload).length);
-    importPayload[newKey] = {
-      title: IMPORT_FIXTURE_TITLE,
-      text_to_replace: IMPORT_FIXTURE_SHORTCODE,
-      path: PNG_DATA_URI,
+    const importPayload = {
+      '0': {
+        title: IMPORT_FIXTURE_TITLE,
+        text_to_replace: IMPORT_FIXTURE_SHORTCODE,
+        path: PNG_DATA_URI,
+      },
     };
 
     const importPath = resolve(HERE, `_import-temp-${Date.now()}.json`);
@@ -133,13 +136,23 @@ await runSpec({
 
     const filechooser = await filechooserPromise;
     toCleanupShortcodes.push(IMPORT_FIXTURE_SHORTCODE);
-    await filechooser.setFiles(importPath);
 
-    // The import handler reloads the page on success. Wait for the
-    // navigation to settle, then re-navigate to admin to confirm the
-    // new row landed.
-    await page.waitForLoadState('load', { timeout: 30_000 });
-    await page.waitForTimeout(1500);
+    // The import handler chain is: FileReader → POST /pianotell/import-emojis →
+    // 200 {legacyShortcodes:[...]} → clearCache (DELETE /api/cache) →
+    // window.location.reload(). clearCache can 409 under load, breaking the
+    // chain. Rather than relying on the auto-reload, wait for the POST to
+    // complete via network interception, then force-navigate to admin
+    // ourselves. Register the response listener BEFORE setFiles triggers
+    // the chain.
+    const importResponse = page.waitForResponse(
+      resp => resp.url().includes('/pianotell/import-emojis'),
+      { timeout: 15_000 }
+    );
+    await filechooser.setFiles(importPath);
+    const resp = await importResponse;
+    check('import POST succeeded', resp.status() === 200, `status=${resp.status()}`);
+
+    await page.waitForTimeout(2000);
     // Force a full reload to clear any stale app.store state
     await page.goto(BASE + '/admin', { waitUntil: 'networkidle' });
     await gotoAdmin(page, BASE);

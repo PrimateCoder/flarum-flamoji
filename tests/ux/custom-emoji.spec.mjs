@@ -16,15 +16,17 @@
 //
 // Failure mode: writes tests/ux/_failure.png + _failures.json, exits non-zero.
 
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { runSpec, openComposer } from '../../.pianotell/tests/ux/helpers.mjs';
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { runSpec, openComposer } from "../../.pianotell/tests/ux/helpers.mjs";
 import {
   gotoAdmin,
   addCustomEmoji,
   deleteCustomEmojiByShortcode,
   listCustomEmojiShortcodes,
-} from './_admin.mjs';
+  applySettings,
+  DEFAULTS,
+} from "./_admin.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -33,21 +35,41 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // a 1×1 transparent PNG data URI — the admin UI doesn't validate the
 // path, and emoji-mart still renders the tile (with a broken image
 // glyph) which is enough for the click flow to register.
-const FIXTURE_TITLE = 'Flamoji UX Fixture';
-const FIXTURE_SHORTCODE = ':flamoji_ux_fixture:';
+const FIXTURE_TITLE = "Flamoji UX Fixture";
+const FIXTURE_SHORTCODE = ":flamoji_ux_fixture:";
 const FIXTURE_PATH =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+
+// Second fixture, assigned a freeform category. Used to prove that a
+// categorized custom emoji gets its OWN nav tab in the picker (emoji-mart
+// drops 2nd+ custom categories from the nav unless each carries an
+// explicit `icon`, which buildPicker now sets to the first emoji's image).
+const CAT_FIXTURE_TITLE = "Flamoji UX Cat Fixture";
+const CAT_FIXTURE_SHORTCODE = ":flamoji_ux_cat_fixture:";
+const CAT_FIXTURE_CATEGORY = "Flamoji UX Memes";
 
 // ---------- forum-side helpers (shared shape with picker-features) ----------
 
 async function openPicker(page) {
-  await page.waitForSelector('button.Button-flamoji, button[title*="moji" i]', { timeout: 10_000 });
+  await page.waitForSelector('button.Button-flamoji, button[title*="moji" i]', {
+    timeout: 10_000,
+  });
   await page.click('button.Button-flamoji, button[title*="moji" i]');
-  await page.waitForSelector('em-emoji-picker.flamoji-picker-popup', { timeout: 15_000 });
-  await page.waitForFunction(() => {
-    const sr = document.querySelector('em-emoji-picker.flamoji-picker-popup')?.shadowRoot;
-    return sr && (sr.querySelector('.category button') || sr.querySelector('nav button'));
-  }, { timeout: 15_000 });
+  await page.waitForSelector("em-emoji-picker.flamoji-picker-popup", {
+    timeout: 15_000,
+  });
+  await page.waitForFunction(
+    () => {
+      const sr = document.querySelector(
+        "em-emoji-picker.flamoji-picker-popup"
+      )?.shadowRoot;
+      return (
+        sr &&
+        (sr.querySelector(".category button") || sr.querySelector("nav button"))
+      );
+    },
+    { timeout: 15_000 }
+  );
   await page.waitForTimeout(300);
 }
 
@@ -58,46 +80,60 @@ async function openPicker(page) {
 // no Custom nav exists (i.e. no custom emoji on the forum at all).
 async function pickerSnapshot(page) {
   await page.evaluate(() => {
-    const sr = document.querySelector('em-emoji-picker.flamoji-picker-popup').shadowRoot;
-    const customNav = [...sr.querySelectorAll('nav button[aria-label]')].find((b) =>
-      /custom/i.test(b.getAttribute('aria-label') || '')
+    const sr = document.querySelector(
+      "em-emoji-picker.flamoji-picker-popup"
+    ).shadowRoot;
+    const customNav = [...sr.querySelectorAll("nav button[aria-label]")].find(
+      (b) => /custom/i.test(b.getAttribute("aria-label") || "")
     );
     customNav?.click();
   });
   await page.waitForTimeout(400);
   return await page.evaluate(() => {
-    const sr = document.querySelector('em-emoji-picker.flamoji-picker-popup').shadowRoot;
-    const navLabels = [...sr.querySelectorAll('nav button[aria-label]')].map((b) =>
-      b.getAttribute('aria-label')
+    const sr = document.querySelector(
+      "em-emoji-picker.flamoji-picker-popup"
+    ).shadowRoot;
+    const navLabels = [...sr.querySelectorAll("nav button[aria-label]")].map(
+      (b) => b.getAttribute("aria-label")
     );
-    const customCat = [...sr.querySelectorAll('.category')].find((c) =>
-      /custom/i.test(c.querySelector('.sticky')?.textContent || '')
+    const customCat = [...sr.querySelectorAll(".category")].find((c) =>
+      /custom/i.test(c.querySelector(".sticky")?.textContent || "")
     );
     const customTileCount = customCat
-      ? [...customCat.querySelectorAll('button')].filter((b) => !b.hasAttribute('aria-selected')).length
+      ? [...customCat.querySelectorAll("button")].filter(
+          (b) => !b.hasAttribute("aria-selected")
+        ).length
       : 0;
-    return { navLabels, hasCustomNav: navLabels.some((l) => /custom/i.test(l)), customTileCount };
+    return {
+      navLabels,
+      hasCustomNav: navLabels.some((l) => /custom/i.test(l)),
+      customTileCount,
+    };
   });
 }
 
 async function setSearch(page, q) {
   await page.evaluate((query) => {
-    const picker = document.querySelector('em-emoji-picker.flamoji-picker-popup');
+    const picker = document.querySelector(
+      "em-emoji-picker.flamoji-picker-popup"
+    );
     const input = picker.shadowRoot.querySelector('input[type="search"]');
     input.focus();
     const proto = Object.getPrototypeOf(input);
-    const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+    const setter = Object.getOwnPropertyDescriptor(proto, "value").set;
     setter.call(input, query);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
   }, q);
   await page.waitForTimeout(400);
 }
 
 async function searchResultCount(page) {
   return await page.evaluate(() => {
-    const sr = document.querySelector('em-emoji-picker.flamoji-picker-popup').shadowRoot;
-    const cat = [...sr.querySelectorAll('.category')].find((c) =>
-      /search/i.test(c.querySelector('.sticky')?.textContent || '')
+    const sr = document.querySelector(
+      "em-emoji-picker.flamoji-picker-popup"
+    ).shadowRoot;
+    const cat = [...sr.querySelectorAll(".category")].find((c) =>
+      /search/i.test(c.querySelector(".sticky")?.textContent || "")
     );
     if (!cat) return 0;
     return [...cat.querySelectorAll('button[type="button"]')].length;
@@ -106,9 +142,11 @@ async function searchResultCount(page) {
 
 async function clickFirstResult(page) {
   return await page.evaluate(() => {
-    const sr = document.querySelector('em-emoji-picker.flamoji-picker-popup').shadowRoot;
-    const cat = [...sr.querySelectorAll('.category')].find((c) =>
-      /search/i.test(c.querySelector('.sticky')?.textContent || '')
+    const sr = document.querySelector(
+      "em-emoji-picker.flamoji-picker-popup"
+    ).shadowRoot;
+    const cat = [...sr.querySelectorAll(".category")].find((c) =>
+      /search/i.test(c.querySelector(".sticky")?.textContent || "")
     );
     const tile = cat && cat.querySelector('button[type="button"]');
     if (!tile) return false;
@@ -118,133 +156,336 @@ async function clickFirstResult(page) {
 }
 
 async function composerText(page) {
-  return await page.evaluate(() => document.querySelector('.ComposerBody textarea')?.value ?? '');
+  return await page.evaluate(
+    () => document.querySelector(".ComposerBody textarea")?.value ?? ""
+  );
 }
 
 // ---------- main ----------
 
-await runSpec({
-  specName: 'custom-emoji',
-  outputDir: HERE,
-}, async ({ page, check, BASE }) => {
-  await page.context().setExtraHTTPHeaders({ 'cache-control': 'no-cache' });
+await runSpec(
+  {
+    specName: "custom-emoji",
+    outputDir: HERE,
+  },
+  async ({ page, check, BASE }) => {
+    await page.context().setExtraHTTPHeaders({ "cache-control": "no-cache" });
 
-  // === 0. baseline: clean stale fixture (best-effort), then capture
-  // the pre-fixture state of both the admin list AND the forum picker.
-  // The test forum may already have other custom emoji (e.g. a
-  // pre-existing :pianotell:); we don't want to depend on the exact
-  // count, so all later assertions are baseline-relative. ===
-  console.log('\n[scenario] baseline');
-  await gotoAdmin(page, BASE);
-  await deleteCustomEmojiByShortcode(page, FIXTURE_SHORTCODE).catch(() => {});
-  const adminBaseline = await listCustomEmojiShortcodes(page);
-  console.log(`  → admin list baseline: ${JSON.stringify(adminBaseline)}`);
+    // === 0. baseline: clean stale fixture (best-effort), then capture
+    // the pre-fixture state of both the admin list AND the forum picker.
+    // The test forum may already have other custom emoji (e.g. a
+    // pre-existing :pianotell:); we don't want to depend on the exact
+    // count, so all later assertions are baseline-relative. ===
+    console.log("\n[scenario] baseline");
+    await gotoAdmin(page, BASE);
+    await deleteCustomEmojiByShortcode(page, FIXTURE_SHORTCODE).catch(() => {});
+    const adminBaseline = await listCustomEmojiShortcodes(page);
+    console.log(`  → admin list baseline: ${JSON.stringify(adminBaseline)}`);
 
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await openComposer(page);
-  await openPicker(page);
-  const pickerBaseline = await pickerSnapshot(page);
-  console.log(`  → picker baseline: customTileCount=${pickerBaseline.customTileCount}`);
+    await page.goto(BASE, { waitUntil: "networkidle" });
+    await openComposer(page);
+    await openPicker(page);
+    const pickerBaseline = await pickerSnapshot(page);
+    console.log(
+      `  → picker baseline: customTileCount=${pickerBaseline.customTileCount}`
+    );
 
-  // === 1. CREATE via admin "Add Emoji" modal ===
-  console.log('\n[scenario] create custom emoji via admin UI');
-  await gotoAdmin(page, BASE);
-  await addCustomEmoji(page, {
-    title: FIXTURE_TITLE,
-    shortcode: FIXTURE_SHORTCODE,
-    path: FIXTURE_PATH,
-  });
-  const adminAfterCreate = await listCustomEmojiShortcodes(page);
-  console.log(`  → admin list after create: ${JSON.stringify(adminAfterCreate)}`);
-  check(
-    'admin Custom Emojis list contains the new fixture row',
-    adminAfterCreate.includes(FIXTURE_SHORTCODE),
-    JSON.stringify(adminAfterCreate)
-  );
-  check(
-    'admin list grew by exactly one row after create',
-    adminAfterCreate.length === adminBaseline.length + 1,
-    `before=${adminBaseline.length} after=${adminAfterCreate.length}`
-  );
+    // === 1. CREATE via admin "Add Emoji" modal ===
+    console.log("\n[scenario] create custom emoji via admin UI");
+    await gotoAdmin(page, BASE);
+    await addCustomEmoji(page, {
+      title: FIXTURE_TITLE,
+      shortcode: FIXTURE_SHORTCODE,
+      path: FIXTURE_PATH,
+    });
+    const adminAfterCreate = await listCustomEmojiShortcodes(page);
+    console.log(
+      `  → admin list after create: ${JSON.stringify(adminAfterCreate)}`
+    );
+    check(
+      "admin Custom Emojis list contains the new fixture row",
+      adminAfterCreate.includes(FIXTURE_SHORTCODE),
+      JSON.stringify(adminAfterCreate)
+    );
+    check(
+      "admin list grew by exactly one row after create",
+      adminAfterCreate.length === adminBaseline.length + 1,
+      `before=${adminBaseline.length} after=${adminAfterCreate.length}`
+    );
 
-  // === 2. VISIBILITY in the forum picker ===
-  console.log('\n[scenario] custom emoji surfaces in forum picker');
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await openComposer(page);
-  await openPicker(page);
-  const afterCreate = await pickerSnapshot(page);
-  console.log(`  → picker after create: customTileCount=${afterCreate.customTileCount}`);
-  check(
-    'picker shows a Custom category nav button',
-    afterCreate.hasCustomNav,
-    `nav=${JSON.stringify(afterCreate.navLabels)}`
-  );
-  check(
-    'Custom category gains exactly one tile after admin create',
-    afterCreate.customTileCount === pickerBaseline.customTileCount + 1,
-    `before=${pickerBaseline.customTileCount} after=${afterCreate.customTileCount}`
-  );
+    // === 2. VISIBILITY in the forum picker ===
+    console.log("\n[scenario] custom emoji surfaces in forum picker");
+    await page.goto(BASE, { waitUntil: "networkidle" });
+    await openComposer(page);
+    await openPicker(page);
+    const afterCreate = await pickerSnapshot(page);
+    console.log(
+      `  → picker after create: customTileCount=${afterCreate.customTileCount}`
+    );
+    check(
+      "picker shows a Custom category nav button",
+      afterCreate.hasCustomNav,
+      `nav=${JSON.stringify(afterCreate.navLabels)}`
+    );
+    check(
+      "Custom category gains exactly one tile after admin create",
+      afterCreate.customTileCount === pickerBaseline.customTileCount + 1,
+      `before=${pickerBaseline.customTileCount} after=${afterCreate.customTileCount}`
+    );
 
-  // === 3. SEARCH by a name token. emoji-mart's SearchIndex pre-builds
-  // a token pool from the custom emoji's `name` and `keywords`; in
-  // practice "flamoji" reliably matches our fixture (other emoji on
-  // this forum don't carry that token), while shorter generic words
-  // like "fixture" can be missed by the index. Pick a token that's
-  // distinctive AND in the name so the assertion is robust. ===
-  // === 3. SEARCH by a name token. emoji-mart's SearchIndex is built
-  // once when the picker first opens, so we need a fresh page (new
-  // tab) to get a picker instance that includes the newly created
-  // emoji in its search index. ===
-  console.log('\n[scenario] picker search by name token');
-  const page2 = await page.context().newPage();
-  await page2.goto(BASE, { waitUntil: 'networkidle' });
-  await openComposer(page2);
-  await openPicker(page2);
-  await setSearch(page2, 'flamoji');
-  const resultsByTitle = await searchResultCount(page2);
-  check(
-    'searching the picker for "flamoji" returns at least one tile',
-    resultsByTitle >= 1,
-    `count=${resultsByTitle}`
-  );
+    // === 3. SEARCH by a name token. emoji-mart's SearchIndex is built
+    // once when the picker first opens, so we use a fresh page (new tab) to
+    // get a picker instance whose index includes the newly created emoji.
+    //
+    // Search for "fixture": a token unique to this fixture's title
+    // ("Flamoji UX Fixture"). Note we deliberately do NOT search "flamoji"
+    // here — every custom emoji's emoji-mart id is prefixed "flamoji-"
+    // (see buildPicker), and emoji-mart indexes the id, so "flamoji" matches
+    // every custom emoji on the forum (e.g. a path-based :pianotell:) and the
+    // id-based localeCompare tie-break can rank another emoji first. ===
+    console.log("\n[scenario] picker search by name token");
+    const page2 = await page.context().newPage();
+    await page2.goto(BASE, { waitUntil: "networkidle" });
+    await openComposer(page2);
+    await openPicker(page2);
+    await setSearch(page2, "fixture");
+    const resultsByTitle = await searchResultCount(page2);
+    check(
+      'searching the picker for "fixture" returns at least one tile',
+      resultsByTitle >= 1,
+      `count=${resultsByTitle}`
+    );
 
-  // === 4. SEARCH + INSERT inserts the configured shortcode ===
-  console.log('\n[scenario] click first search hit → composer gains shortcode');
-  const beforeText = await composerText(page2);
-  const clicked = await clickFirstResult(page2);
-  check('first search result is clickable', clicked);
-  await page2.waitForTimeout(200);
-  const afterText = await composerText(page2);
-  check(
-    'clicking the custom-emoji tile inserts the shortcode',
-    afterText.includes(FIXTURE_SHORTCODE),
-    `before="${beforeText}" after="${afterText}"`
-  );
-  await page2.close();
+    // === 3b. PREVIEW shows the configured shortcode, not the image path ===
+    // emoji-mart renders `:<emoji id>:` as the preview subtitle. buildPicker
+    // sets the custom emoji id to the configured shortcode (sans colons), so
+    // hovering the fixture must preview `:flamoji_ux_fixture:` — NOT
+    // `:flamoji-https://…:`, the old bug where the id was the image path.
+    console.log("\n[scenario] preview shows the configured shortcode");
+    const tileCenter = await page2.evaluate(() => {
+      const sr = document.querySelector(
+        "em-emoji-picker.flamoji-picker-popup"
+      ).shadowRoot;
+      const cat = [...sr.querySelectorAll(".category")].find((c) =>
+        /search/i.test(c.querySelector(".sticky")?.textContent || "")
+      );
+      const tile = cat && cat.querySelector("button");
+      if (!tile) return null;
+      const r = tile.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+    if (tileCenter) {
+      // A real pointer move triggers emoji-mart's onMouseEnter → preview update
+      // (synthetic events don't reliably populate the preview state).
+      await page2.mouse.move(tileCenter.x, tileCenter.y);
+      await page2.waitForTimeout(500);
+    }
+    const previewSubtitle = await page2.evaluate(() => {
+      const sr = document.querySelector(
+        "em-emoji-picker.flamoji-picker-popup"
+      ).shadowRoot;
+      const s = sr.querySelector(".preview-subtitle");
+      return s ? s.textContent.trim() : "(none)";
+    });
+    check(
+      "picker preview shows the configured shortcode, not the image path",
+      previewSubtitle === FIXTURE_SHORTCODE,
+      `subtitle="${previewSubtitle}"`
+    );
 
-  // === 5. DELETE via admin pencil → modal Delete button ===
-  console.log('\n[scenario] delete custom emoji via admin UI');
-  await gotoAdmin(page, BASE);
-  const deleted = await deleteCustomEmojiByShortcode(page, FIXTURE_SHORTCODE);
-  check('admin delete flow ran (row found, modal opened, Delete clicked)', deleted);
-  const adminAfterDelete = await listCustomEmojiShortcodes(page);
-  check(
-    'admin Custom Emojis list returns to baseline after delete',
-    adminAfterDelete.length === adminBaseline.length &&
-      !adminAfterDelete.includes(FIXTURE_SHORTCODE),
-    `baseline=${adminBaseline.length} after=${adminAfterDelete.length} list=${JSON.stringify(adminAfterDelete)}`
-  );
+    // === 4. SEARCH + INSERT inserts the configured shortcode ===
+    console.log(
+      "\n[scenario] click first search hit → composer gains shortcode"
+    );
+    const beforeText = await composerText(page2);
+    const clicked = await clickFirstResult(page2);
+    check("first search result is clickable", clicked);
+    await page2.waitForTimeout(200);
+    const afterText = await composerText(page2);
+    check(
+      "clicking the custom-emoji tile inserts the shortcode",
+      afterText.includes(FIXTURE_SHORTCODE),
+      `before="${beforeText}" after="${afterText}"`
+    );
+    await page2.close();
 
-  // === 6. PICKER returns to baseline tile count ===
-  console.log('\n[scenario] picker returns to baseline after delete');
-  await page.goto(BASE, { waitUntil: 'networkidle' });
-  await openComposer(page);
-  await openPicker(page);
-  const afterDelete = await pickerSnapshot(page);
-  console.log(`  → picker after delete: customTileCount=${afterDelete.customTileCount}`);
-  check(
-    'Custom category tile count returns to baseline',
-    afterDelete.customTileCount === pickerBaseline.customTileCount,
-    `baseline=${pickerBaseline.customTileCount} after=${afterDelete.customTileCount}`
-  );
-});
+    // === 4b. CATEGORY: a custom emoji assigned a freeform category gets
+    // its own dedicated picker nav tab (labeled with the category name),
+    // alongside the default Custom tab. This proves the per-category `icon`
+    // fix: without it, emoji-mart marks every custom category after the
+    // first as a `target` and drops it from the nav bar entirely. ===
+    console.log(
+      "\n[scenario] categorized custom emoji gets its own picker tab"
+    );
+    await gotoAdmin(page, BASE);
+    await deleteCustomEmojiByShortcode(page, CAT_FIXTURE_SHORTCODE).catch(
+      () => {}
+    );
+    await addCustomEmoji(page, {
+      title: CAT_FIXTURE_TITLE,
+      shortcode: CAT_FIXTURE_SHORTCODE,
+      path: FIXTURE_PATH,
+      category: CAT_FIXTURE_CATEGORY,
+    });
+
+    const page3 = await page.context().newPage();
+    await page3.goto(BASE, { waitUntil: "networkidle" });
+    await openComposer(page3);
+    await openPicker(page3);
+    const catSnap = await pickerSnapshot(page3);
+    console.log(`  → picker nav labels: ${JSON.stringify(catSnap.navLabels)}`);
+    check(
+      "categorized emoji adds a dedicated nav tab labeled with its category",
+      catSnap.navLabels.includes(CAT_FIXTURE_CATEGORY),
+      `nav=${JSON.stringify(catSnap.navLabels)}`
+    );
+    check(
+      "the default Custom tab coexists with the named category tab",
+      catSnap.navLabels.some((l) => /custom/i.test(l)),
+      `nav=${JSON.stringify(catSnap.navLabels)}`
+    );
+    await page3.close();
+
+    // Clean up the categorized fixture so the forum returns to baseline.
+    await gotoAdmin(page, BASE);
+    await deleteCustomEmojiByShortcode(page, CAT_FIXTURE_SHORTCODE).catch(
+      () => {}
+    );
+
+    // === 4c. Frequently Used in sticker mode: suppressed-then-configurable ===
+    // Two behaviors guarded here:
+    //  (a) Frequently Used starts EMPTY (no emoji-mart unicode defaults) — on
+    //      a cleared cache the tab is absent until the user picks something.
+    //  (b) Once the user picks a custom sticker, the tab appears and is
+    //      restricted to custom stickers (sticker mode exposes no unicode
+    //      categories). This is the regression guard for the bug where the
+    //      sticker-mode filter stripped 'frequent' entirely.
+    // The main FIXTURE custom emoji still exists here, so effectiveStickerMode
+    // is active.
+    console.log(
+      "\n[scenario] sticker mode: Frequently Used suppressed then configurable"
+    );
+    await applySettings(
+      page,
+      { ...DEFAULTS, sticker_mode: true, show_recents: true },
+      BASE
+    );
+
+    // (a) Cleared cache → no defaults, so no Frequently Used tab yet.
+    await page.goto(BASE, { waitUntil: "networkidle" });
+    await page.evaluate(() => localStorage.removeItem("emoji-mart.frequently"));
+    await page.reload({ waitUntil: "networkidle" });
+    await openComposer(page);
+    await openPicker(page);
+    const stickerFresh = await pickerSnapshot(page);
+    console.log(
+      `  → sticker, cleared cache nav: ${JSON.stringify(
+        stickerFresh.navLabels
+      )}`
+    );
+    check(
+      "sticker + cleared cache → no Frequently Used (no unicode defaults)",
+      !stickerFresh.navLabels.some((l) => /frequent/i.test(l)),
+      `nav=${JSON.stringify(stickerFresh.navLabels)}`
+    );
+
+    // Pick a custom sticker tile (records it in the frequently index).
+    const pickedSticker = await page.evaluate(() => {
+      const sr = document.querySelector(
+        "em-emoji-picker.flamoji-picker-popup"
+      ).shadowRoot;
+      const tile = [...sr.querySelectorAll(".category button")].find(
+        (b) => !b.hasAttribute("aria-selected")
+      );
+      tile?.click();
+      return !!tile;
+    });
+    check("a custom sticker tile was pickable in sticker mode", pickedSticker);
+    await page.waitForTimeout(400);
+
+    // (b) After the pick → Frequently Used present, restricted to custom.
+    await page.goto(BASE, { waitUntil: "networkidle" });
+    await openComposer(page);
+    await openPicker(page);
+    const stickerAfterPick = await pickerSnapshot(page);
+    console.log(
+      `  → sticker, after pick nav: ${JSON.stringify(
+        stickerAfterPick.navLabels
+      )}`
+    );
+    check(
+      "sticker mode + a picked sticker → Frequently Used tab present",
+      stickerAfterPick.navLabels.some((l) => /frequent/i.test(l)),
+      `nav=${JSON.stringify(stickerAfterPick.navLabels)}`
+    );
+    check(
+      "sticker mode still restricts to custom (no built-in unicode tabs)",
+      // Match the distinctive built-in emoji-mart category labels only. NB
+      // the seed data has CUSTOM categories named "Animals"/"Memes"/etc., so
+      // we must not match those — key off the multi-word unicode labels
+      // ("Animals & Nature", "Food & Drink", "Travel & Places", "Smileys &
+      // People") and the unambiguous single-word ones.
+      !stickerAfterPick.navLabels.some((l) =>
+        /smileys|nature|drink|activities|places|objects|symbols|flags/i.test(l)
+      ),
+      `nav=${JSON.stringify(stickerAfterPick.navLabels)}`
+    );
+
+    // show_recents OFF → no Frequently Used tab regardless of stored picks.
+    await applySettings(
+      page,
+      { ...DEFAULTS, sticker_mode: true, show_recents: false },
+      BASE
+    );
+    await page.goto(BASE, { waitUntil: "networkidle" });
+    await openComposer(page);
+    await openPicker(page);
+    const stickerRecentsOff = await pickerSnapshot(page);
+    console.log(
+      `  → sticker, recents off nav: ${JSON.stringify(
+        stickerRecentsOff.navLabels
+      )}`
+    );
+    check(
+      "sticker mode + show_recents OFF → no Frequently Used tab",
+      !stickerRecentsOff.navLabels.some((l) => /frequent/i.test(l)),
+      `nav=${JSON.stringify(stickerRecentsOff.navLabels)}`
+    );
+
+    // Restore defaults (sticker off) before the delete/baseline scenarios.
+    await applySettings(page, DEFAULTS, BASE);
+
+    // === 5. DELETE via admin pencil → modal Delete button ===
+    console.log("\n[scenario] delete custom emoji via admin UI");
+    await gotoAdmin(page, BASE);
+    const deleted = await deleteCustomEmojiByShortcode(page, FIXTURE_SHORTCODE);
+    check(
+      "admin delete flow ran (row found, modal opened, Delete clicked)",
+      deleted
+    );
+    const adminAfterDelete = await listCustomEmojiShortcodes(page);
+    check(
+      "admin Custom Emojis list returns to baseline after delete",
+      adminAfterDelete.length === adminBaseline.length &&
+        !adminAfterDelete.includes(FIXTURE_SHORTCODE),
+      `baseline=${adminBaseline.length} after=${
+        adminAfterDelete.length
+      } list=${JSON.stringify(adminAfterDelete)}`
+    );
+
+    // === 6. PICKER returns to baseline tile count ===
+    console.log("\n[scenario] picker returns to baseline after delete");
+    await page.goto(BASE, { waitUntil: "networkidle" });
+    await openComposer(page);
+    await openPicker(page);
+    const afterDelete = await pickerSnapshot(page);
+    console.log(
+      `  → picker after delete: customTileCount=${afterDelete.customTileCount}`
+    );
+    check(
+      "Custom category tile count returns to baseline",
+      afterDelete.customTileCount === pickerBaseline.customTileCount,
+      `baseline=${pickerBaseline.customTileCount} after=${afterDelete.customTileCount}`
+    );
+  }
+);

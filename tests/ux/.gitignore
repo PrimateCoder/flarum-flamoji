@@ -1,0 +1,4 @@
+
+# Transient UX screenshot-comparison artifacts
+_baselines/*-actual.png
+_baselines/*-diff.png

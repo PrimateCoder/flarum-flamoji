@@ -25,7 +25,40 @@ export default class EditEmojiModal extends Modal {
 
     this.emojiTitle = Stream(this.emoji.title() || '');
     this.textToReplace = Stream(this.emoji.textToReplace() || '');
+    this.category = Stream(this.emoji.category() || '');
     this.path = Stream(this.emoji.path() || '');
+
+    // Remember the stored trigger so we can grandfather it: an existing
+    // (possibly legacy, non-canonical) shortcode that the admin doesn't
+    // change must still be saveable when editing other fields.
+    this.originalTrigger = (this.emoji.textToReplace() || '').trim();
+  }
+
+  // Canonical shortcode format, mirrored from the server (EmojiRules).
+  // Returns an error string when the *changed* trigger isn't canonical, or
+  // null when it's valid or an unchanged legacy value.
+  shortcodeError() {
+    const value = this.textToReplace().trim();
+    if (value === '') return null; // emptiness handled on submit / server-side
+    if (this.emoji.exists && value === this.originalTrigger) return null; // grandfather
+    if (!/^:[a-zA-Z0-9_+-]+:$/.test(value)) {
+      return app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.shortcode_invalid', {}, true);
+    }
+    return null;
+  }
+
+  /**
+   * Distinct, sorted list of category names already in use, sourced from
+   * the emoji records in the store. Drives the <datalist> so admins reuse
+   * existing spellings instead of creating near-duplicates.
+   */
+  existingCategories() {
+    const seen = new Set();
+    app.store.all('emojis').forEach((emoji) => {
+      const c = (emoji.category() || '').trim();
+      if (c) seen.add(c);
+    });
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
   }
 
   className() {
@@ -56,21 +89,56 @@ export default class EditEmojiModal extends Modal {
     const items = new ItemList();
 
     items.add(
+      'intro',
+      <div className="Form-group">
+        <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.intro_text')}</div>
+      </div>,
+      60
+    );
+
+    items.add(
       'title',
       <div className="Form-group">
         <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.emoji_title_label')}</label>
         <input className="FormControl" bidi={this.emojiTitle} />
+        <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.emoji_title_text')}</div>
       </div>,
       50
     );
 
+    const shortcodeError = this.shortcodeError();
+
     items.add(
       'textToReplace',
-      <div className="Form-group">
+      <div className={'Form-group' + (shortcodeError ? ' has-error' : '')}>
         <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.text_to_replace_label')}</label>
-        <input className="FormControl" bidi={this.textToReplace} />
+        <input className="FormControl" placeholder=":myemoji_partyparrot:" bidi={this.textToReplace} />
+        <div className={'helpText' + (shortcodeError ? ' EditEmojiModal-error' : '')}>
+          {shortcodeError || app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.text_to_replace_text')}
+        </div>
       </div>,
       40
+    );
+
+    items.add(
+      'category',
+      <div className="Form-group">
+        <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.category_label')}</label>
+        <input
+          className="FormControl"
+          list="flamoji-category-suggestions"
+          maxlength="255"
+          placeholder={app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.category_placeholder', {}, true)}
+          bidi={this.category}
+        />
+        <datalist id="flamoji-category-suggestions">
+          {this.existingCategories().map((c) => (
+            <option value={c} />
+          ))}
+        </datalist>
+        <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.category_text')}</div>
+      </div>,
+      35
     );
 
     items.add(
@@ -78,6 +146,7 @@ export default class EditEmojiModal extends Modal {
       <div className="Form-group">
         <label>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.path_or_url_label')}</label>
         <input className="FormControl" placeholder="/assets/emojis/batman.png" bidi={this.path} />
+        <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.path_or_url_text')}</div>
       </div>,
       30
     );
@@ -90,6 +159,7 @@ export default class EditEmojiModal extends Modal {
             type: 'submit',
             className: 'Button Button--primary EditEmojiModal-save',
             loading: this.loading,
+            disabled: !!shortcodeError,
           },
           app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.submit_button')
         )}
@@ -111,12 +181,19 @@ export default class EditEmojiModal extends Modal {
     return {
       title: this.emojiTitle(),
       textToReplace: this.textToReplace(),
+      category: this.category().trim() || null,
       path: this.path(),
     };
   }
 
   onsubmit(e) {
     e.preventDefault();
+
+    // Defense-in-depth: the submit button is disabled when invalid, but
+    // guard here too (Enter key) so we never POST a non-canonical shortcode
+    // the server will reject.
+    if (this.shortcodeError()) return;
+
     this.loading = true;
 
     const exists = this.emoji.exists;
@@ -167,7 +244,11 @@ export default class EditEmojiModal extends Modal {
   }
 
   showSuccessMessage() {
-    return app.alerts.show(Alert, { type: 'success' }, app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.saved_message'));
+    return app.alerts.show(
+      Alert,
+      { type: 'success' },
+      app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.edit_emoji.saved_message')
+    );
   }
 
   showCacheClearWarning(err) {

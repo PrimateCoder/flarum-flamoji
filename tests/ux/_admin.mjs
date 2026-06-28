@@ -39,7 +39,7 @@ export const DEFAULTS = Object.freeze({
   show_variants: true,
   show_category_buttons: true,
   show_recents: true,
-  prepopulate_recents: true,
+  sticker_mode: false,
   picker_set: 'auto',
   frequent_rows: 4,
   // All eight categories enabled = "no narrowing".
@@ -54,6 +54,7 @@ const SWITCH_LABELS = {
   show_preview: 'Show preview section',
   show_search: 'Show search input',
   show_variants: 'Show skin-tone variants',
+  sticker_mode: 'Sticker mode',
   show_category_buttons: 'Show category buttons',
   show_recents: 'Show (and save) frequently used emojis',
 };
@@ -153,15 +154,6 @@ export async function applySettings(page, overrides, baseUrl) {
     if (key in overrides) await setSwitch(page, label, !!overrides[key]);
   }
   if ('picker_set' in overrides) await setSelectByValue(page, overrides.picker_set);
-  if ('prepopulate_recents' in overrides) {
-    // Only renders when show_recents is ON. Skip if show_recents is
-    // being turned OFF in this same call (the switch won't be in the DOM).
-    const recentsOn = 'show_recents' in overrides ? !!overrides.show_recents : true;
-    if (recentsOn) {
-      await page.waitForTimeout(200);
-      await setSwitch(page, 'Pre-populate with popular emojis', !!overrides.prepopulate_recents);
-    }
-  }
   if ('frequent_rows' in overrides) {
     // The Frequent emoji rows input only renders when show_recents is
     // ON. Caller's responsibility to ensure that — we don't toggle it
@@ -246,11 +238,11 @@ export async function listCustomEmojiShortcodes(page) {
 // Note: the modal re-renders on every keystroke (the modal title binds
 // to the live emojiTitle stream), so previously-resolved input handles
 // can become detached. Re-query before each fill to be safe.
-export async function addCustomEmoji(page, { title, shortcode, path }) {
+export async function addCustomEmoji(page, { title, shortcode, path, category }) {
   await page.click('.customEmoji-addButton');
   await page.waitForSelector('.EditEmojiModal', { timeout: 10_000 });
 
-  for (const [idx, value] of [[0, title], [1, shortcode], [2, path]]) {
+  for (const [idx, value] of [[0, title], [1, shortcode], [2, category ?? ''], [3, path]]) {
     const input = await page.evaluateHandle((i) => {
       return document.querySelectorAll('.EditEmojiModal .FormControl')[i];
     }, idx);

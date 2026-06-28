@@ -93,7 +93,7 @@ await runSpec({
   check('search input present', snap.hasSearchInput === true);
   check('preview pane present', snap.hasPreview === true);
   check('skin-tone button present', snap.hasSkinToneButton === true);
-  check('nav has 8+ category buttons (default 9 incl. Frequent)', (snap.navLabels?.length ?? 0) >= 8,
+  check('nav has 8+ category buttons (8 built-in + Custom; Frequent appears after first pick)', (snap.navLabels?.length ?? 0) >= 8,
     `navLabels=${JSON.stringify(snap.navLabels)}`);
   check('first tile uses Twemoji-style sprite', snap.firstTileHasSpriteBackground === true,
     `firstTileUsesTwemojiSprite=${snap.firstTileUsesTwemojiSprite}`);

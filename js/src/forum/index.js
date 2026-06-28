@@ -25,12 +25,30 @@ const t_p = t + 'emoji-mart.';
 // re-pinning this URL to the corresponding emoji-datasource-twitter
 // release — verify by checking that the sprite's tile count matches
 // `data.sheet.cols`/`data.sheet.rows`.
-const TWEMOJI_SPRITESHEET_URL =
-  'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/sheets-256/64.png';
+const TWEMOJI_SPRITESHEET_URL = 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/sheets-256/64.png';
+
+// "Sticker mode" grid (admin toggle, flamoji.sticker_mode). 64px glyph in an
+// 80px tile; `dynamicWidth` lets emoji-mart compute perLine from the popup's
+// CSS width (set responsively in less/forum.less) rather than a fixed column
+// count, so the grid adapts to the viewport / mobile.
+const STICKER_GRID = { emojiSize: 64, emojiButtonSize: 80, dynamicWidth: true };
 
 app.initializers.add(
   'pianotell-flamoji',
   () => {
+    // Sticker mode is a forum-wide style toggle: when on, custom emoji
+    // render at sticker size everywhere (existing posts + the live composer
+    // preview), not just in the picker. Drive a root class that
+    // less/forum.less keys the enlarged `span.flamoji img` rule off of.
+    // `app.forum` isn't populated until AFTER initializers run, so defer the
+    // read to a microtask (and guard it) — reading it synchronously here
+    // throws and aborts the whole initializer.
+    Promise.resolve().then(() => {
+      if (app.forum && app.forum.attribute('flamoji.sticker_mode')) {
+        document.documentElement.classList.add('flamoji--sticker');
+      }
+    });
+
     /**
      * Build the emoji-mart i18n object from Flarum's translator. emoji-mart
      * shallow-merges the `i18n` prop on top of its built-in English
@@ -233,6 +251,11 @@ app.initializers.add(
       if (this._flamojiLoader) return;
       const loader = document.createElement('div');
       loader.className = 'flamoji-picker-loader';
+      // Match the loader's footprint to the (responsive) sticker picker so
+      // the swap from placeholder to real picker isn't a size jump.
+      if (app.forum.attribute('flamoji.sticker_mode')) {
+        loader.classList.add('flamoji-picker-loader--sticker');
+      }
       loader.setAttribute('role', 'status');
       loader.setAttribute('aria-live', 'polite');
 
@@ -262,7 +285,11 @@ app.initializers.add(
         this._flamojiLoaderReposition = null;
       }
       if (this._flamojiLoader) {
-        try { this._flamojiLoader.remove(); } catch (e) { /* already detached */ }
+        try {
+          this._flamojiLoader.remove();
+        } catch (e) {
+          /* already detached */
+        }
         this._flamojiLoader = null;
       }
     }
@@ -377,7 +404,7 @@ app.initializers.add(
       const { Picker } = emojiMartModule;
       const data = dataModule.default || dataModule;
 
-      const specifiedCategories = JSON.parse(app.forum.attribute('flamoji.specify_categories'));
+      let specifiedCategories = JSON.parse(app.forum.attribute('flamoji.specify_categories'));
       const sortingArr = getEmojiCategories();
       // Order of `categories` in the picker prop drives nav-tab order.
       specifiedCategories.sort((a, b) => sortingArr.indexOf(a) - sortingArr.indexOf(b));
@@ -387,60 +414,101 @@ app.initializers.add(
       // text without round-tripping through paths or URLs.
       const customEmojiReplacers = {};
       const customEmojis = [];
-      const customEntries = [];
+
+      // emoji-mart's `custom` prop is an array of categories, each rendered
+      // as its own nav tab. Group the flat custom-emoji list by its freeform
+      // `category` name (whitespace-trimmed, exact match); emoji with no
+      // category fall into the default "Custom" group. Opaque ids are
+      // assigned after sorting (see below) so the freeform category text is
+      // never turned into a DOM/category id.
+      const CUSTOM_LABEL = app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.custom');
+      const customGroups = new Map(); // trimmed category name ('' = uncategorized) -> group
 
       response['data'].forEach((customEmoji) => {
         const path = customEmoji['attributes']['path'];
         const title = customEmoji['attributes']['title'];
         const replacer = customEmoji['attributes']['text_to_replace'];
-        // Use the path as a stable id; paths are unique in the custom-emoji table.
-        const id = 'flamoji-' + path;
+        const category = (customEmoji['attributes']['category'] || '').trim();
+        const src = urlChecker(path) ? path : baseUrl + path;
+
+        // emoji-mart uses an emoji's `id` as its shortcode and renders
+        // `:<id>:` as the preview subtitle, so use the configured shortcode
+        // (sans the surrounding colons) as the id. text_to_replace is unique
+        // — enforced server-side and required by the text formatter — so
+        // these ids are unique too. (Fall back to a path-based id for the
+        // degenerate case of a colons-only shortcode that strips to nothing.)
+        const stripped = replacer.replace(/^:|:$/g, '');
+        const id = stripped || 'flamoji-' + path;
 
         // emoji-mart's SearchIndex tokenizes name + each keyword and does
         // prefix matching per token. Build a comprehensive keyword set
         // from both the title and the shortcode so users can find the
         // emoji by typing any word in either, regardless of separator
         // (space, dash, underscore) or surrounding colons.
-        const stripped = replacer.replace(/^:|:$/g, '');
         const keywords = new Set();
-        [title, stripped].forEach((src) => {
-          if (!src) return;
-          keywords.add(src.toLowerCase());
-          src.toLowerCase().split(/[\s\-_]+/).filter(Boolean).forEach((tok) => keywords.add(tok));
+        [title, stripped].forEach((kwSrc) => {
+          if (!kwSrc) return;
+          keywords.add(kwSrc.toLowerCase());
+          kwSrc
+            .toLowerCase()
+            .split(/[\s\-_]+/)
+            .filter(Boolean)
+            .forEach((tok) => keywords.add(tok));
         });
 
         customEmojiReplacers[id] = replacer;
-        customEntries.push({
+
+        if (!customGroups.has(category)) {
+          customGroups.set(category, {
+            name: category || CUSTOM_LABEL,
+            // emoji-mart marks every custom category after the first that
+            // lacks an `icon` as a `target` and drops it from the nav bar.
+            // Give each group its first emoji's image as the icon so every
+            // category renders as its own selectable, distinguishable tab.
+            icon: { src },
+            emojis: [],
+          });
+        }
+        customGroups.get(category).emojis.push({
           id,
           name: title,
           keywords: Array.from(keywords),
-          skins: [{ src: urlChecker(path) ? path : baseUrl + path }],
+          skins: [{ src }],
         });
       });
 
-      if (customEntries.length) {
-        customEmojis.push({
-          id: 'flamoji_custom',
-          name: app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.custom'),
-          emojis: customEntries,
+      if (customGroups.size) {
+        // Order tabs deterministically: named categories alphabetically,
+        // with the uncategorized "Custom" group last (insertion order would
+        // otherwise be arbitrary from the admin's perspective).
+        const groups = Array.from(customGroups.entries()).sort(([a], [b]) => {
+          if (a === '') return 1;
+          if (b === '') return -1;
+          return a.localeCompare(b);
         });
 
-        // emoji-mart's `categories` prop is an explicit allow-list. If we
-        // pass `custom` items but don't include their category id here,
-        // the picker silently hides the entire Custom tab. Append the
-        // custom group's id to the allow-list so it shows up at the end.
-        if (specifiedCategories.indexOf('flamoji_custom') === -1) {
-          specifiedCategories.push('flamoji_custom');
-        }
+        groups.forEach(([name, group], i) => {
+          // Opaque id: the uncategorized group keeps the bare id, named
+          // groups get an index suffix. All share the `flamoji_custom`
+          // prefix that the sticker-mode filter relies on, and none can
+          // collide with a built-in emoji-mart category id.
+          group.id = name === '' ? 'flamoji_custom' : 'flamoji_custom_' + i;
+          customEmojis.push(group);
+          specifiedCategories.push(group.id);
+        });
       }
 
       const autoHide = !!app.forum.attribute('flamoji.auto_hide');
       const showRecents = !!app.forum.attribute('flamoji.show_recents');
-      const prepopulateRecents = !!app.forum.attribute('flamoji.prepopulate_recents');
       const showPreview = !!app.forum.attribute('flamoji.show_preview');
       const showSearch = !!app.forum.attribute('flamoji.show_search');
       const showVariants = !!app.forum.attribute('flamoji.show_variants');
       const showCategoryButtons = !!app.forum.attribute('flamoji.show_category_buttons');
+      const stickerMode = !!app.forum.attribute('flamoji.sticker_mode');
+      // Sticker mode only enlarges custom emoji, so on a forum with no custom
+      // emoji it would just leave a sticker-sized grid of normal unicode
+      // emoji. Gate the entire behaviour on having at least one custom group.
+      const effectiveStickerMode = stickerMode && customGroups.size > 0;
 
       // emoji-mart's `categories` prop is an explicit allow-list. When
       // showRecents is enabled, we still need 'frequent' on the list or
@@ -449,6 +517,17 @@ app.initializers.add(
       // it appears first as emoji-mart expects.
       if (showRecents && specifiedCategories.indexOf('frequent') === -1) {
         specifiedCategories.unshift('frequent');
+      }
+
+      // Sticker mode only enlarges custom emoji (the unicode set keeps its
+      // default size, since those render as fonts/sprites, not <img>). So
+      // when it's on, restrict the picker to the custom categories only —
+      // the built-in unicode tabs would otherwise sit at normal size amongst
+      // the stickers and just add noise. The Frequently Used tab is exempt:
+      // it stays driven by show_recents exactly like normal mode, so users
+      // keep quick access to their most-used stickers.
+      if (effectiveStickerMode) {
+        specifiedCategories = specifiedCategories.filter((id) => id === 'frequent' || id.indexOf('flamoji_custom') === 0);
       }
 
       // Match the picker's emoji rendering to what posts will actually
@@ -460,14 +539,18 @@ app.initializers.add(
       const hasEmojiExt = !!app.forum.attribute('flamoji.has_emoji_extension');
       const useTwemoji = pickerSet === 'twemoji' || (pickerSet === 'auto' && hasEmojiExt);
 
-      // When prepopulate is OFF, seed emoji-mart's localStorage with an
-      // empty frequently-used index so it doesn't fall back to its
-      // hardcoded popular-emoji defaults. Once the user picks an emoji,
-      // emoji-mart overwrites this with real data that persists normally.
-      if (showRecents && !prepopulateRecents) {
-        const key = 'emoji-mart.frequently';
-        if (!window.localStorage.getItem(key)) {
-          window.localStorage.setItem(key, JSON.stringify({}));
+      // emoji-mart stores a per-browser Frequently Used index in localStorage
+      // ('emoji-mart.frequently'); when it's ABSENT it falls back to a
+      // hardcoded list of popular *unicode* defaults. Seed an empty index so
+      // those defaults never appear: Frequently Used should reflect the user's
+      // own picks (the standard picker convention), and the generic defaults
+      // are often emoji this picker can't even show (custom-only/sticker mode,
+      // deselected categories). The tab simply appears once the user picks
+      // their first emoji; real picks overwrite this seed normally.
+      if (showRecents) {
+        const FREQUENTLY_KEY = 'emoji-mart.frequently';
+        if (window.localStorage.getItem(FREQUENTLY_KEY) == null) {
+          window.localStorage.setItem(FREQUENTLY_KEY, JSON.stringify({}));
         }
       }
 
@@ -483,19 +566,19 @@ app.initializers.add(
         autoFocus: false,
         set: useTwemoji ? 'twitter' : 'native',
         ...(useTwemoji ? { getSpritesheetURL: () => TWEMOJI_SPRITESHEET_URL } : {}),
-        // Tile sizing — use emoji-mart defaults (perLine: 9,
-        // emojiSize: 24, emojiButtonSize: 36). We previously bumped
-        // these for a chunkier grid, but at larger sizes WebKit's
-        // sub-pixel-rounded IntersectionObserver in emoji-mart's
-        // NavBar reliably mis-picks the previous category when
-        // clicking Travel & Places / Flags (the indicator highlights
-        // the wrong icon). Defaults stay clean across all category
-        // configurations.
+        // Tile sizing. Default (perLine 9 / emojiSize 24 / emojiButtonSize
+        // 36) is emoji-mart's own — at larger sizes WebKit's sub-pixel
+        // IntersectionObserver in emoji-mart's NavBar mis-picks a category on
+        // click. When sticker mode is on we accept that for the enlarged grid.
+        ...(effectiveStickerMode ? STICKER_GRID : {}),
         previewPosition: showPreview ? 'bottom' : 'none',
         searchPosition: showSearch ? 'sticky' : 'none',
-        skinTonePosition: showVariants ? 'preview' : 'none',
+        // Custom emoji have a single image (no skin-tone variants), so the
+        // skin-tone selector is non-functional in sticker mode (which shows
+        // only custom emoji). Suppress it there regardless of the setting.
+        skinTonePosition: showVariants && !effectiveStickerMode ? 'preview' : 'none',
         navPosition: showCategoryButtons ? 'top' : 'none',
-        maxFrequentRows: showRecents ? (parseInt(app.forum.attribute('flamoji.frequent_rows'), 10) || 4) : 0,
+        maxFrequentRows: showRecents ? parseInt(app.forum.attribute('flamoji.frequent_rows'), 10) || 4 : 0,
         onEmojiSelect: (emoji) => {
           // Built-in emoji: insert the native Unicode character. Custom emoji
           // (those we registered above) carry our own id; insert the
@@ -531,6 +614,9 @@ app.initializers.add(
       // changes (e.g. category navigation expanding rows).
       this.picker = picker;
       picker.classList.add('flamoji-picker-popup');
+      if (effectiveStickerMode) {
+        picker.classList.add('flamoji-picker-popup--sticker');
+      }
       // Tear down the loading placeholder right before the real picker is
       // attached so positioning math (which is shared) sees the correct
       // mount target.
@@ -604,54 +690,53 @@ app.initializers.add(
         onPickerButtonClick._versioned = true;
       }
 
-      const loadAndBuild = () => Promise.all([
-        import(/* webpackChunkName: "emoji-mart" */ 'emoji-mart'),
-        import(/* webpackChunkName: "emoji-mart-data" */ '@emoji-mart/data/sets/15/twitter.json'),
-        app.request({
-          method: 'GET',
-          url: app.forum.attribute('apiUrl') + '/pianotell/emojis',
-          params: { filter: { all: 1 } },
-        }),
-      ])
-        .then(([emojiMartModule, dataModule, response]) => {
-          // Guard against the editor being torn down (composer closed,
-          // navigated away) while chunks were downloading. Without this
-          // we'd append a picker to document.body that nothing references
-          // and leak listeners on a detached editor element.
-          if (!this.element || !this.element.isConnected) {
+      const loadAndBuild = () =>
+        Promise.all([
+          import(/* webpackChunkName: "emoji-mart" */ 'emoji-mart'),
+          import(/* webpackChunkName: "emoji-mart-data" */ '@emoji-mart/data/sets/15/twitter.json'),
+          app.request({
+            method: 'GET',
+            url: app.forum.attribute('apiUrl') + '/pianotell/emojis',
+            params: { filter: { all: 1 } },
+          }),
+        ])
+          .then(([emojiMartModule, dataModule, response]) => {
+            // Guard against the editor being torn down (composer closed,
+            // navigated away) while chunks were downloading. Without this
+            // we'd append a picker to document.body that nothing references
+            // and leak listeners on a detached editor element.
+            if (!this.element || !this.element.isConnected) {
+              this.isPickerLoading = false;
+              unmountPickerLoader.call(this);
+              return;
+            }
+            // Defensive: a corrupt or proxied API response could leave us
+            // without the expected JSON:API shape. Coerce to an empty list
+            // rather than crashing inside the forEach loop.
+            const safeResponse = response && Array.isArray(response.data) ? response : { data: [] };
+            buildPicker.call(this, emojiMartModule, dataModule, safeResponse);
+          })
+          .catch((err) => {
+            console.error('[pianotell-flamoji] failed to load picker:', err);
             this.isPickerLoading = false;
-            unmountPickerLoader.call(this);
-            return;
-          }
-          // Defensive: a corrupt or proxied API response could leave us
-          // without the expected JSON:API shape. Coerce to an empty list
-          // rather than crashing inside the forEach loop.
-          const safeResponse = response && Array.isArray(response.data)
-            ? response
-            : { data: [] };
-          buildPicker.call(this, emojiMartModule, dataModule, safeResponse);
-        })
-        .catch((err) => {
-          console.error('[pianotell-flamoji] failed to load picker:', err);
-          this.isPickerLoading = false;
-          // Inline error card with Retry button on the loader surface,
-          // plus a top-of-page Alert (some users keep focus inside the
-          // composer and miss page-level alerts).
-          showLoaderError.call(this, () => {
-            this.isPickerLoading = true;
+            // Inline error card with Retry button on the loader surface,
+            // plus a top-of-page Alert (some users keep focus inside the
+            // composer and miss page-level alerts).
+            showLoaderError.call(this, () => {
+              this.isPickerLoading = true;
+              m.redraw();
+              scheduleLoaderMount.call(this);
+              loadAndBuild();
+            });
+            if (app.alerts) {
+              app.alerts.show(
+                Alert,
+                { type: 'error', dismissible: true },
+                app.translator.trans('pianotell-flamoji.forum.composer.picker_load_error')
+              );
+            }
             m.redraw();
-            scheduleLoaderMount.call(this);
-            loadAndBuild();
           });
-          if (app.alerts) {
-            app.alerts.show(
-              Alert,
-              { type: 'error', dismissible: true },
-              app.translator.trans('pianotell-flamoji.forum.composer.picker_load_error')
-            );
-          }
-          m.redraw();
-        });
 
       loadAndBuild();
     }
