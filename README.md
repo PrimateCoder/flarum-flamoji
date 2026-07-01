@@ -16,7 +16,7 @@ Screenshot:
 - Add an emoji picker to the text editor (compatible with dark mode).
 - **Picker style is configurable** — choose [Twemoji](https://github.com/jdecked/twemoji) glyphs (sourced from a jsDelivr-hosted spritesheet) or your operating system's native emoji font, or leave the picker on `Auto` to mirror what posts actually display (Twemoji when [`flarum/emoji`](https://github.com/flarum/emoji) is enabled, native otherwise).
 - Add custom emojis to the picker.
-- **Organize custom emojis into named categories** — assign each a freeform category and it gets its own tab in the picker.
+- **Organize custom emojis into named categories** — assign each a freeform category and it gets its own tab in the picker. Each category is also exposed on rendered emoji so you can style them per category from your own CSS (see [Styling emojis by category](#styling-emojis-by-category)).
 - **Sticker mode** — an optional admin toggle that renders custom emojis as large stickers in posts, the composer preview, and the picker.
 - Import and export custom emoji configurations.
 - Picker code and emoji data load lazily on first open (no impact on initial page load); when Twemoji is selected, the image spritesheet is fetched from jsDelivr on first picker render. Native mode adds zero image bytes.
@@ -36,6 +36,23 @@ php flarum migrate
 php flarum assets:publish
 php flarum cache:clear
 ```
+
+## Styling emojis by category
+
+Custom emojis render with their category on the wrapping `<span>` as a
+`data-flamoji-category` attribute (the exact category name you set in the
+admin panel). This lets you size or style emojis per category from your own
+theme/CSS — for example, to make everything in a "Stickers" category larger:
+
+```css
+span.flamoji[data-flamoji-category="Stickers"] img {
+  height: 35px;
+  vertical-align: bottom;
+}
+```
+
+Uncategorized emojis render as plain `<span class="flamoji">` with no
+attribute, so they're unaffected.
 
 ## Links
 

@@ -1,3 +1,7 @@
+### 1.4.0 — 2026-06-30
+
+- **Style custom emojis by category from your own CSS.** Custom emojis now render with a `data-flamoji-category` attribute on the wrapping `<span>` carrying the emoji's category, so you can target them per category — e.g. `span.flamoji[data-flamoji-category="Stickers"] img { height: 35px }`. Uncategorized emojis are unchanged.
+
 ### 1.3.0 — 2026-06-27
 
 - **Custom emoji categories** — organize custom emojis into named tabs in the picker. Assign each emoji a freeform **Category** in the admin panel; emojis sharing a category appear together under their own picker tab, with the category's first emoji as the tab icon. Emojis left without a category stay in the default Custom tab. Categories are included in JSON import/export.
