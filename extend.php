@@ -51,6 +51,10 @@ return [
         ->default('pianotell-flamoji.show_recents', true)
         ->default('pianotell-flamoji.frequent_rows', 4)
         ->default('pianotell-flamoji.specify_categories', '["people","nature","foods","activity","places","objects","symbols","flags"]')
+        ->default('pianotell-flamoji.use_cdn', false)
+        ->default('pianotell-flamoji.cdn_js_url', 'https://cdn.jsdelivr.net/npm/emoji-mart@5.6.0/dist/browser.min.js')
+        ->default('pianotell-flamoji.cdn_js_sri', '')
+        ->default('pianotell-flamoji.cdn_data_url', 'https://cdn.jsdelivr.net/npm/@emoji-mart/data@1.2.1/sets/15/twitter.json')
         ->serializeToForum('flamoji.auto_hide', 'pianotell-flamoji.auto_hide', 'boolVal')
         ->serializeToForum('flamoji.show_preview', 'pianotell-flamoji.show_preview', 'boolVal')
         ->serializeToForum('flamoji.show_search', 'pianotell-flamoji.show_search', 'boolVal')
@@ -60,7 +64,11 @@ return [
         ->serializeToForum('flamoji.sticker_mode', 'pianotell-flamoji.sticker_mode', 'boolVal')
         ->serializeToForum('flamoji.show_recents', 'pianotell-flamoji.show_recents', 'boolVal')
         ->serializeToForum('flamoji.frequent_rows', 'pianotell-flamoji.frequent_rows', 'intVal')
-        ->serializeToForum('flamoji.specify_categories', 'pianotell-flamoji.specify_categories'),
+        ->serializeToForum('flamoji.specify_categories', 'pianotell-flamoji.specify_categories')
+        ->serializeToForum('flamoji.use_cdn', 'pianotell-flamoji.use_cdn', 'boolVal')
+        ->serializeToForum('flamoji.cdn_js_url', 'pianotell-flamoji.cdn_js_url')
+        ->serializeToForum('flamoji.cdn_js_sri', 'pianotell-flamoji.cdn_js_sri')
+        ->serializeToForum('flamoji.cdn_data_url', 'pianotell-flamoji.cdn_data_url'),
 
     // Surface whether the core flarum/emoji extension is currently enabled,
     // so the picker can match its rendering style (Twemoji vs OS native)

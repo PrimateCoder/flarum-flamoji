@@ -22,6 +22,11 @@ pianotell-flamoji:
       show_category_buttons_text: Show the row of category icons at the top of the picker. Useful to disable when only one or two categories are enabled.
       show_search_label: Show search input
       show_search_text: Show the search box at the top of the picker.
+      use_cdn_label: Load Emoji-Mart via CDN
+      use_cdn_text: Load the emoji-mart library and data from a third-party CDN instead of hosting them locally. If either URL field is left empty, it will gracefully fallback to loading from your local server.
+      cdn_js_url_label: CDN JavaScript URL
+      cdn_js_sri_label: JavaScript SRI Hash (Optional)
+      cdn_data_url_label: CDN Data URL
       show_recents_label: Show (and save) frequently used emojis
       show_recents_text: Show the Frequently Used tab at the top of the picker. It starts empty and fills as each member picks emojis. Each user's frequents are saved in their own browser only.
       frequent_rows_label: Frequent emoji rows

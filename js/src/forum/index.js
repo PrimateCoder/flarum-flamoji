@@ -690,16 +690,53 @@ app.initializers.add(
         onPickerButtonClick._versioned = true;
       }
 
-      const loadAndBuild = () =>
-        Promise.all([
-          import(/* webpackChunkName: "emoji-mart" */ 'emoji-mart'),
-          import(/* webpackChunkName: "emoji-mart-data" */ '@emoji-mart/data/sets/15/twitter.json'),
-          app.request({
-            method: 'GET',
-            url: app.forum.attribute('apiUrl') + '/pianotell/emojis',
-            params: { filter: { all: 1 } },
-          }),
-        ])
+      const loadAndBuild = () => {
+        const useCdn = app.forum.attribute('flamoji.use_cdn');
+        let loadJs;
+        const cdnJsUrl = app.forum.attribute('flamoji.cdn_js_url');
+        if (useCdn && cdnJsUrl) {
+          const cdnJsSri = app.forum.attribute('flamoji.cdn_js_sri');
+
+          loadJs = new Promise((resolve, reject) => {
+            if (window.EmojiMart) return resolve(window.EmojiMart);
+            const script = document.createElement('script');
+            script.src = cdnJsUrl;
+            if (cdnJsSri) {
+              script.integrity = cdnJsSri;
+              script.crossOrigin = 'anonymous';
+            }
+            script.onload = () => resolve(window.EmojiMart);
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+        } else {
+          loadJs = import(/* webpackChunkName: "emoji-mart" */ 'emoji-mart');
+        }
+
+        const loadApi = app.request({
+          method: 'GET',
+          url: app.forum.attribute('apiUrl') + '/pianotell/emojis',
+          params: { filter: { all: 1 } },
+        });
+
+        const loadData = loadApi.then(response => {
+          const stickerMode = !!app.forum.attribute('flamoji.sticker_mode');
+          const customEmojisCount = response && Array.isArray(response.data) ? response.data.length : 0;
+          const effectiveStickerMode = stickerMode && customEmojisCount > 0;
+
+          if (effectiveStickerMode) {
+            return { categories: [], emojis: {}, aliases: {}, sheet: { cols: 1, rows: 1 } };
+          }
+
+          const cdnDataUrl = app.forum.attribute('flamoji.cdn_data_url');
+          if (useCdn && cdnDataUrl) {
+            return fetch(cdnDataUrl).then(res => res.json());
+          } else {
+            return import(/* webpackChunkName: "emoji-mart-data" */ '@emoji-mart/data/sets/15/twitter.json');
+          }
+        });
+
+        return Promise.all([loadJs, loadData, loadApi])
           .then(([emojiMartModule, dataModule, response]) => {
             // Guard against the editor being torn down (composer closed,
             // navigated away) while chunks were downloading. Without this
@@ -737,6 +774,7 @@ app.initializers.add(
             }
             m.redraw();
           });
+      };
 
       loadAndBuild();
     }

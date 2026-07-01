@@ -97,6 +97,33 @@ app.initializers.add('pianotell-flamoji', (app) => {
             </div>
             <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.show_search_text')}</div>
           </div>
+          <div className="Flamoji--generalUISetting">
+            <div className="Form-group">
+              <Switch
+                state={!!this.setting(['pianotell-flamoji.use_cdn'])() && this.setting(['pianotell-flamoji.use_cdn'])() !== '0'}
+                onchange={this.settings['pianotell-flamoji.use_cdn']}
+              >
+                {app.translator.trans('pianotell-flamoji.admin.settings.use_cdn_label')}
+              </Switch>
+            </div>
+            <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.use_cdn_text')}</div>
+          </div>
+          {!!this.setting(['pianotell-flamoji.use_cdn'])() && this.setting(['pianotell-flamoji.use_cdn'])() !== '0' && (
+            <div className="Flamoji--generalUISetting">
+              <div className="Form-group">
+                <label>{app.translator.trans('pianotell-flamoji.admin.settings.cdn_js_url_label')}</label>
+                <input className="FormControl" type="text" bidi={this.setting('pianotell-flamoji.cdn_js_url')} />
+              </div>
+              <div className="Form-group">
+                <label>{app.translator.trans('pianotell-flamoji.admin.settings.cdn_js_sri_label')}</label>
+                <input className="FormControl" type="text" bidi={this.setting('pianotell-flamoji.cdn_js_sri')} />
+              </div>
+              <div className="Form-group">
+                <label>{app.translator.trans('pianotell-flamoji.admin.settings.cdn_data_url_label')}</label>
+                <input className="FormControl" type="text" bidi={this.setting('pianotell-flamoji.cdn_data_url')} />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="Flamoji--emojiSettingsContainer">
