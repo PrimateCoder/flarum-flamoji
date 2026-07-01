@@ -1,3 +1,7 @@
+### 2.4.0 — 2026-06-30
+
+- **Style custom emojis by category from your own CSS.** Custom emojis now render with a `data-flamoji-category` attribute on the wrapping `<span>` carrying the emoji's category, so you can target them per category — e.g. `span.flamoji[data-flamoji-category="Stickers"] img { height: 35px }`. Uncategorized emojis are unchanged.
+
 ### 2.3.0 — 2026-06-26
 
 - **Frequently Used now starts empty and reflects only emoji you've actually used.** On a fresh browser it previously pre-filled with emoji-mart's built-in "popular" defaults — generic Unicode emoji unrelated to your forum, and in sticker/custom-only mode (or with categories disabled) even emoji the picker couldn't insert. The tab now begins empty and fills from each member's own picks — the standard emoji-picker behavior — saved per browser.

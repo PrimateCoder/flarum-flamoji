@@ -53,10 +53,21 @@ class ConfigureTextFormatter
                 $path = $this->url->to('forum')->base() . $path;
             }
 
+            // Expose the emoji's category on the rendered span so admins can
+            // size/style per category from their own CSS, e.g.
+            //   span.flamoji[data-flamoji-category="Memes"] img { height: 35px }
+            // The value is the exact (freeform) category text — escaped like
+            // the alt/title so it's safe inside the attribute. Uncategorized
+            // emoji get no attribute (unchanged markup).
+            $category = trim((string) $emoji->category);
+            $categoryAttr = $category !== ''
+                ? ' data-flamoji-category="' . htmlspecialchars($category, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"'
+                : '';
+
             $config->Emoticons->add(
                 $emoji->text_to_replace,
                 '
-                    <span class="flamoji">
+                    <span class="flamoji"' . $categoryAttr . '>
                         <img src="' . htmlspecialchars($path, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '" alt="' . htmlspecialchars((string) $emoji->title, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '" />
                     </span>
                 '
