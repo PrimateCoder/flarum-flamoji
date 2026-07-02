@@ -13,6 +13,10 @@
       "checked": true
     },
     {
+      "label": "Load Emoji-Mart via CDN",
+      "checked": false
+    },
+    {
       "label": "Show skin-tone variants",
       "checked": true
     },
