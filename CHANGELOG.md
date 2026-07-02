@@ -1,3 +1,8 @@
+### 2.4.1 — 2026-07-01
+
+- **Fixed a rare memory leak** where closing the composer while the emoji picker was still loading — and that load then failed — could leave an orphaned loading placeholder and window listeners behind.
+- **Internal:** refactored the picker into a Mithril component plus a dedicated controller class. No user-facing change.
+
 ### 2.4.0 — 2026-06-30
 
 - **Style custom emojis by category from your own CSS.** Custom emojis now render with a `data-flamoji-category` attribute on the wrapping `<span>` carrying the emoji's category, so you can target them per category — e.g. `span.flamoji[data-flamoji-category="Stickers"] img { height: 35px }`. Uncategorized emojis are unchanged.
