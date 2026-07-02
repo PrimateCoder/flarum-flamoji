@@ -1,3 +1,13 @@
+### 2.5.0 — 2026-07-02
+
+- **Load emoji-mart from a CDN (optional).** A new "Load Emoji-Mart via CDN" admin toggle serves the emoji-mart library and emoji data from a third-party CDN (jsDelivr by default) instead of from your own server. It ships with pinned URLs and matching Subresource Integrity (SRI) hashes, so integrity checking is on out of the box and both the script and the dataset are verified. If the CDN is unreachable — or an SRI hash doesn't match — the picker automatically falls back to the copy bundled with the extension, so it never breaks. Off by default; loading from an external origin requires your Content-Security-Policy (if any) to allow it. Thanks to @huoxin233 for the original contribution.
+- **Faster first picker open, especially in sticker mode.** The emoji library, dataset, and your custom emoji now load in parallel. In sticker mode the picker skips downloading the ~460 KB Unicode emoji dataset entirely (it only needs your custom stickers), so it opens noticeably quicker.
+
+### 2.4.1 — 2026-07-01
+
+- **Fixed a rare memory leak** where closing the composer while the emoji picker was still loading — and that load then failed — could leave an orphaned loading placeholder and window listeners behind.
+- **Internal:** refactored the picker into a Mithril component plus a dedicated controller class. No user-facing change.
+
 ### 2.4.0 — 2026-06-30
 
 - **Style custom emojis by category from your own CSS.** Custom emojis now render with a `data-flamoji-category` attribute on the wrapping `<span>` carrying the emoji's category, so you can target them per category — e.g. `span.flamoji[data-flamoji-category="Stickers"] img { height: 35px }`. Uncategorized emojis are unchanged.
@@ -35,6 +45,11 @@
 
 - **Ported to Flarum 2.x.** Requires `flarum/core: ^2.0.0-beta` and `php: ^8.3`.
 - Added picker variant and admin console baseline tests.
+
+### 1.5.0 — 2026-07-02
+
+- **Load emoji-mart from a CDN (optional).** A new "Load Emoji-Mart via CDN" admin toggle serves the emoji-mart library and emoji data from a third-party CDN (jsDelivr by default) instead of from your own server. It ships with pinned URLs and matching Subresource Integrity (SRI) hashes, so integrity checking is on out of the box and both the script and the dataset are verified. If the CDN is unreachable — or an SRI hash doesn't match — the picker automatically falls back to the copy bundled with the extension, so it never breaks. Off by default; loading from an external origin requires your Content-Security-Policy (if any) to allow it. Thanks to @huoxin233 for the original contribution.
+- **Faster first picker open, especially in sticker mode.** The emoji library, dataset, and your custom emoji now load in parallel. In sticker mode the picker skips downloading the ~460 KB Unicode emoji dataset entirely (it only needs your custom stickers), so it opens noticeably quicker.
 
 ### 1.4.0 — 2026-06-30
 
