@@ -51,6 +51,7 @@ export default class PickerController {
     this.host = host;
 
     this.picker = null;
+    this._disposed = false;
 
     this.isLoading = false;
     this.isLoaded = false;
@@ -282,10 +283,18 @@ export default class PickerController {
       .catch((err) => {
         console.error('[pianotell-flamoji] failed to load picker:', err);
         this.isLoading = false;
+        // If the owning component was disposed (composer closed / navigated
+        // away) while the load was in flight, don't resurrect a loader that
+        // nothing will ever tear down — just clean up and bail.
+        if (this._disposed || !this._isConnected()) {
+          this.unmountLoader();
+          return;
+        }
         // Inline error card with Retry button on the loader surface, plus a
         // top-of-page Alert (some users keep focus inside the composer and miss
         // page-level alerts).
         this.showLoaderError(() => {
+          if (this._disposed || !this._isConnected()) return;
           this.isLoading = true;
           m.redraw();
           this.scheduleLoaderMount();
@@ -397,6 +406,7 @@ export default class PickerController {
    * window listener.
    */
   dispose() {
+    this._disposed = true;
     if (this._reposition) {
       window.removeEventListener('resize', this._reposition);
       window.removeEventListener('scroll', this._reposition, true);
