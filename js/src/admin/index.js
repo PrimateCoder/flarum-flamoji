@@ -122,6 +122,11 @@ app.initializers.add('pianotell-flamoji', (app) => {
                 <label>{app.translator.trans('pianotell-flamoji.admin.settings.cdn_data_url_label')}</label>
                 <input className="FormControl" type="text" bidi={this.setting('pianotell-flamoji.cdn_data_url')} />
               </div>
+              <div className="Form-group">
+                <label>{app.translator.trans('pianotell-flamoji.admin.settings.cdn_data_sri_label')}</label>
+                <input className="FormControl" type="text" bidi={this.setting('pianotell-flamoji.cdn_data_sri')} />
+              </div>
+              <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.cdn_advanced_text')}</div>
             </div>
           )}
         </div>

@@ -52,9 +52,15 @@ return [
         ->default('pianotell-flamoji.frequent_rows', 4)
         ->default('pianotell-flamoji.specify_categories', '["people","nature","foods","activity","places","objects","symbols","flags"]')
         ->default('pianotell-flamoji.use_cdn', false)
-        ->default('pianotell-flamoji.cdn_js_url', 'https://cdn.jsdelivr.net/npm/emoji-mart@5.6.0/dist/browser.min.js')
-        ->default('pianotell-flamoji.cdn_js_sri', '')
+        // Default to the immutable, npm-published `browser.js` (not jsdelivr's
+        // on-the-fly `browser.min.js`, whose bytes — and therefore SRI — aren't
+        // guaranteed stable). browser.js is already a production parcel build,
+        // so it is no larger than the "minified" variant, and its content hash
+        // is fixed for this exact version, letting us ship a working default SRI.
+        ->default('pianotell-flamoji.cdn_js_url', 'https://cdn.jsdelivr.net/npm/emoji-mart@5.6.0/dist/browser.js')
+        ->default('pianotell-flamoji.cdn_js_sri', 'sha384-lONtvEeik96slH87Kr9CY74xGakohuxbgkyhwbPDOM9ZzVfW7Twaltwp+WrerZ9k')
         ->default('pianotell-flamoji.cdn_data_url', 'https://cdn.jsdelivr.net/npm/@emoji-mart/data@1.2.1/sets/15/twitter.json')
+        ->default('pianotell-flamoji.cdn_data_sri', 'sha384-nTfzV//8XRZRt4ms47kKHhRH4UmfMKauaSKfgROlVYFtjpLp1A5uvbfltNZBdDPV')
         ->serializeToForum('flamoji.auto_hide', 'pianotell-flamoji.auto_hide', 'boolVal')
         ->serializeToForum('flamoji.show_preview', 'pianotell-flamoji.show_preview', 'boolVal')
         ->serializeToForum('flamoji.show_search', 'pianotell-flamoji.show_search', 'boolVal')
@@ -68,7 +74,8 @@ return [
         ->serializeToForum('flamoji.use_cdn', 'pianotell-flamoji.use_cdn', 'boolVal')
         ->serializeToForum('flamoji.cdn_js_url', 'pianotell-flamoji.cdn_js_url')
         ->serializeToForum('flamoji.cdn_js_sri', 'pianotell-flamoji.cdn_js_sri')
-        ->serializeToForum('flamoji.cdn_data_url', 'pianotell-flamoji.cdn_data_url'),
+        ->serializeToForum('flamoji.cdn_data_url', 'pianotell-flamoji.cdn_data_url')
+        ->serializeToForum('flamoji.cdn_data_sri', 'pianotell-flamoji.cdn_data_sri'),
 
     // Surface whether the core flarum/emoji extension is currently enabled,
     // so the picker can match its rendering style (Twemoji vs OS native)
