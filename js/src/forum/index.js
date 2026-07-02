@@ -9,32 +9,16 @@ import { extend } from 'flarum/common/extend';
 
 import app from 'flarum/common/app';
 import Alert from 'flarum/common/components/Alert';
-import getEmojiCategories from '../common/utils/getEmojiCategories';
 import TextEditorButton from './components/TextEditorButton';
 import PickerLoader from './components/PickerLoader';
-import urlChecker from '../common/utils/urlChecker';
+import positionPopup from './utils/positionPopup';
+import { injectEmojiMartRgbVars, injectShadowStyles } from './utils/pickerTheme';
+import buildPickerConfig from './utils/buildPickerConfig';
 
 export { default as extend } from './extend';
 
-// Translation key prefixes
+// Translation key prefix
 const t = 'pianotell-flamoji.forum.';
-const t_p = t + 'emoji-mart.';
-
-// emoji-mart's twitter.json `x`/`y` percentages assume a specific sprite-
-// sheet grid size. @emoji-mart/data v1.2.1 was built against
-// emoji-datasource v15.0.1 (61×61 grid). The matching twitter sprite is
-// emoji-datasource-twitter@15.0.1. Bumping @emoji-mart/data later means
-// re-pinning this URL to the corresponding emoji-datasource-twitter
-// release — verify by checking that the sprite's tile count matches
-// `data.sheet.cols`/`data.sheet.rows`.
-const TWEMOJI_SPRITESHEET_URL = 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/sheets-256/64.png';
-
-// "Sticker mode" grid (admin toggle, flamoji.sticker_mode). 64px glyph in an
-// 80px tile; `dynamicWidth` lets emoji-mart compute perLine from the popup's
-// CSS width (set responsively in less/forum.less) rather than a fixed column
-// count, so the grid adapts to the viewport / mobile. See the emoji-mart
-// "Dynamic width" example: dynamicWidth + a CSS width on em-emoji-picker.
-const STICKER_GRID = { emojiSize: 64, emojiButtonSize: 80, dynamicWidth: true };
 
 app.initializers.add(
   'pianotell-flamoji',
@@ -51,48 +35,6 @@ app.initializers.add(
         document.documentElement.classList.add('flamoji--sticker');
       }
     });
-
-    /**
-     * Build the emoji-mart i18n object from Flarum's translator. emoji-mart
-     * shallow-merges the `i18n` prop on top of its built-in English
-     * defaults, but nested objects (`categories`, `skins`) are *replaced*
-     * wholesale rather than deep-merged — partial objects there leave
-     * downstream code reading from `undefined`. So we always emit the full
-     * nested structure.
-     */
-    function buildI18n() {
-      const cat = (id) => app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.' + id, {}, true);
-      const tp = (key) => app.translator.trans(t_p + key, {}, true);
-      return {
-        search: tp('search_placeholder'),
-        search_no_results_1: tp('no_emojis_found_title'),
-        search_no_results_2: tp('no_emojis_found_message'),
-        pick: tp('pick'),
-        add_custom: tp('add_custom'),
-        categories: {
-          search: tp('category_search'),
-          frequent: cat('frequent'),
-          people: cat('people'),
-          nature: cat('nature'),
-          foods: cat('foods'),
-          activity: cat('activity'),
-          places: cat('places'),
-          objects: cat('objects'),
-          symbols: cat('symbols'),
-          flags: cat('flags'),
-          custom: cat('custom'),
-        },
-        skins: {
-          choose: tp('skin_tone_choose'),
-          1: tp('skin_tone_default'),
-          2: tp('skin_tone_light'),
-          3: tp('skin_tone_medium_light'),
-          4: tp('skin_tone_medium'),
-          5: tp('skin_tone_medium_dark'),
-          6: tp('skin_tone_dark'),
-        },
-      };
-    }
 
     extend('flarum/common/components/TextEditor', ['oncreate', 'onupdate'], function () {
       this.flamojiButton = this.element.querySelector('.Button-flamoji');
@@ -135,9 +77,9 @@ app.initializers.add(
 
     /**
      * Shared positioner used by both the real picker and the loading
-     * placeholder. Same primary/fallback geometry as positionPicker; pulled
-     * out so the loader can reuse it without temporarily aliasing
-     * `this.picker`.
+     * placeholder. Resolves the toolbar-button anchor + composer fallback
+     * anchor from the editor instance, then defers the primary/fallback/clamp
+     * geometry to the pure `positionPopup` helper.
      */
     function positionElement(el) {
       if (!el) return;
@@ -146,49 +88,8 @@ app.initializers.add(
         this.flamojiButton = this.element.querySelector('.Button-flamoji');
       }
       if (!this.flamojiButton) return;
-      const btnRect = this.flamojiButton.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      // Reposition won't work until the element has measurable dimensions —
-      // emoji-mart populates Shadow DOM asynchronously after appendChild,
-      // so the first call right after mount sees width/height of 0. The
-      // ResizeObserver wired up in buildPicker() will re-fire this once
-      // the picker takes its real shape.
-      if (!elRect.width || !elRect.height) return;
-
-      const margin = 6;
-      const screenPadding = 8;
-
-      const minLeft = screenPadding;
-      const maxLeft = window.innerWidth - elRect.width - screenPadding;
-      const minTop = screenPadding;
-      const maxTop = window.innerHeight - elRect.height - screenPadding;
-
-      // Try primary placement: horizontally centered on the button.
-      const btnCenterX = btnRect.left + btnRect.width / 2;
-      let left = btnCenterX - elRect.width / 2;
-      let top;
-
-      if (left < minLeft || left > maxLeft) {
-        // Fallback: horizontally center on the composer body, vertically
-        // anchor the picker's center to the composer's bottom edge.
-        const composer = this.element.closest('.ComposerBody') || this.element;
-        const composerRect = composer.getBoundingClientRect();
-        left = composerRect.left + (composerRect.width - elRect.width) / 2;
-        top = composerRect.bottom - elRect.height / 2;
-      } else {
-        // Primary: float above the button; slide up rather than clip if
-        // there isn't enough room above.
-        top = btnRect.top - margin - elRect.height;
-      }
-
-      // Final clamp keeps the picker fully on-screen in either mode.
-      if (left > maxLeft) left = maxLeft;
-      if (left < minLeft) left = minLeft;
-      if (top > maxTop) top = maxTop;
-      if (top < minTop) top = minTop;
-
-      el.style.top = Math.round(top) + 'px';
-      el.style.left = Math.round(left) + 'px';
+      const composerEl = this.element ? this.element.closest('.ComposerBody') || this.element : null;
+      positionPopup(el, this.flamojiButton, composerEl);
     }
 
     // Clean up the picker DOM + listeners when the editor is removed (e.g.
@@ -336,304 +237,15 @@ app.initializers.add(
     }
 
     /**
-     * Compute emoji-mart --rgb-* triplets from Flarum's live CSS custom
-     * properties and inject them as inline styles on the picker element.
-     * This adapts to the active color scheme (light, dark, high-contrast)
-     * without hardcoding any color values.
-     */
-    function injectEmojiMartRgbVars(picker) {
-      const style = getComputedStyle(document.documentElement);
-      const toRgb = (cssVar) => {
-        const raw = style.getPropertyValue(cssVar).trim();
-        if (!raw) return null;
-        // Parse the computed color value by drawing it through a temp element
-        const el = document.createElement('div');
-        el.style.color = raw;
-        document.body.appendChild(el);
-        const computed = getComputedStyle(el).color;
-        document.body.removeChild(el);
-        // computed is "rgb(r, g, b)" or "rgba(r, g, b, a)"
-        const m = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-        return m ? `${m[1]}, ${m[2]}, ${m[3]}` : null;
-      };
-
-      const bg = toRgb('--body-bg') || '255, 255, 255';
-      const input = toRgb('--control-bg') || '240, 240, 240';
-      const color = toRgb('--text-color') || '17, 17, 17';
-      const accent = toRgb('--primary-color') || '69, 156, 211';
-
-      picker.style.setProperty('--background-rgb', bg);
-      picker.style.setProperty('--rgb-background', bg);
-      picker.style.setProperty('--rgb-input', input);
-      picker.style.setProperty('--rgb-color', color);
-      picker.style.setProperty('--rgb-accent', accent);
-
-      // emoji-mart sets its own --shadow-color that clashes with Flarum's.
-      // Read Flarum's value from the root (before emoji-mart overrides it)
-      // and apply the box-shadow directly as an inline style.
-      const shadowColor = style.getPropertyValue('--shadow-color').trim();
-      if (shadowColor) {
-        picker.style.boxShadow = `0 2px 6px ${shadowColor}`;
-      }
-    }
-
-    /**
-     * emoji-mart's picker lives entirely behind a Shadow DOM, so external
-     * stylesheets can't reach the category headers, search input, etc.
-     * The picker exposes a few CSS custom properties (handled in our LESS
-     * file), but the rest needs CSS injected into the shadow root after
-     * mount. Adopting a sheet is idempotent — re-runs are no-ops because
-     * we tag the element.
-     */
-    function injectShadowStyles(picker) {
-      const root = picker.shadowRoot;
-      if (!root || root.querySelector('style[data-flamoji]')) return;
-
-      // Category headers (`.sticky`) and the search input live behind
-      // emoji-mart's Shadow DOM. Bring them closer to Flarum's form/section
-      // aesthetic via an injected sheet:
-      //
-      // - Headers: slightly larger, semi-bold, with a subtle bottom border
-      //   so categories read as real sections (not just floating labels).
-      //   Use the picker's own background color so they blend when sticky.
-      // - Search: 1px border + a real focus ring using Flarum's primary
-      //   accent. The default emoji-mart input is borderless; with our
-      //   tighter --em-rgb-input matching Flarum's @control-bg, that made
-      //   the field disappear into the chrome.
-      const css = `
-        /* Match the original emoji-button look: medium-weight, ~13px,
-           secondary text color (Flarum's @muted-color piped in via the
-           --flamoji-category-header-color custom prop in less/forum.less).
-           Subtle bottom border + background so the sticky header reads
-           cleanly when categories scroll behind it. */
-        .sticky {
-          font-weight: 700;
-          font-size: 15px;
-          text-transform: none;
-          color: var(--flamoji-category-header-color, rgba(var(--em-rgb-color), 0.75));
-          background: rgb(var(--em-rgb-background));
-          padding: 14px 12px 8px !important;
-          border-bottom: 1px solid var(--em-color-border);
-          margin-bottom: 4px;
-        }
-        .search input[type="search"] {
-          font-size: 14px;
-          border: 1px solid var(--em-color-border);
-          padding-top: 9px;
-          padding-bottom: 9px;
-          transition: border-color 120ms ease, box-shadow 120ms ease;
-        }
-        .search input[type="search"]:focus {
-          border-color: rgb(var(--em-rgb-accent));
-          box-shadow: 0 0 0 2px rgba(var(--em-rgb-accent), 0.25);
-          outline: none;
-        }
-        .search .icon {
-          opacity: 0.5;
-        }
-        nav button {
-          padding: 6px 0;
-        }
-      `;
-      const style = document.createElement('style');
-      style.setAttribute('data-flamoji', '');
-      style.textContent = css;
-      root.appendChild(style);
-    }
-
-    /**
      * Construct the emoji-mart Picker for this TextEditor instance, append
      * it to flamojiContainer, and show it. Called only on the first picker
      * open per editor instance; subsequent opens just toggle visibility.
      */
     function buildPicker(emojiMartModule, dataModule, response) {
-      const baseUrl = app.forum.attribute('baseUrl');
-      const { Picker } = emojiMartModule;
-      const data = dataModule.default || dataModule;
-
-      let specifiedCategories = JSON.parse(app.forum.attribute('flamoji.specify_categories'));
-      const sortingArr = getEmojiCategories();
-      // Order of `categories` in the picker prop drives nav-tab order.
-      specifiedCategories.sort((a, b) => sortingArr.indexOf(a) - sortingArr.indexOf(b));
-
-      // Build a lookup keyed by the id we set on each custom emoji entry,
-      // so the onEmojiSelect handler can find the configured replacement
-      // text without round-tripping through paths or URLs.
-      const customEmojiReplacers = {};
-      const customEmojis = [];
-
-      // emoji-mart's `custom` prop is an array of categories, each rendered
-      // as its own nav tab. Group the flat custom-emoji list by its freeform
-      // `category` name (whitespace-trimmed, exact match); emoji with no
-      // category fall into the default "Custom" group. Opaque ids are
-      // assigned after sorting (see below) so the freeform category text is
-      // never turned into a DOM/category id.
-      const CUSTOM_LABEL = app.translator.trans('pianotell-flamoji.forum.emoji-mart.categories.custom', {}, true);
-      const customGroups = new Map(); // trimmed category name ('' = uncategorized) -> group
-
-      response.forEach((customEmoji) => {
-        const path = customEmoji['path'];
-        const title = customEmoji['title'];
-        const replacer = customEmoji['text_to_replace'];
-        const category = (customEmoji['category'] || '').trim();
-        const src = urlChecker(path) ? path : baseUrl + path;
-
-        // emoji-mart uses an emoji's `id` as its shortcode and renders
-        // `:<id>:` as the preview subtitle, so use the configured shortcode
-        // (sans the surrounding colons) as the id. text_to_replace is unique
-        // — enforced server-side and required by the text formatter — so
-        // these ids are unique too. (Fall back to a path-based id for the
-        // degenerate case of a colons-only shortcode that strips to nothing.)
-        const stripped = replacer.replace(/^:|:$/g, '');
-        const id = stripped || 'flamoji-' + path;
-
-        // emoji-mart's SearchIndex tokenizes name + each keyword and does
-        // prefix matching per token. Build a comprehensive keyword set
-        // from both the title and the shortcode so users can find the
-        // emoji by typing any word in either, regardless of separator
-        // (space, dash, underscore) or surrounding colons.
-        const keywords = new Set();
-        [title, stripped].forEach((kwSrc) => {
-          if (!kwSrc) return;
-          keywords.add(kwSrc.toLowerCase());
-          kwSrc
-            .toLowerCase()
-            .split(/[\s\-_]+/)
-            .filter(Boolean)
-            .forEach((tok) => keywords.add(tok));
-        });
-
-        customEmojiReplacers[id] = replacer;
-
-        if (!customGroups.has(category)) {
-          customGroups.set(category, {
-            name: category || CUSTOM_LABEL,
-            // emoji-mart marks every custom category after the first that
-            // lacks an `icon` as a `target` and drops it from the nav bar.
-            // Give each group its first emoji's image as the icon so every
-            // category renders as its own selectable, distinguishable tab.
-            icon: { src },
-            emojis: [],
-          });
-        }
-        customGroups.get(category).emojis.push({
-          id,
-          name: title,
-          keywords: Array.from(keywords),
-          skins: [{ src }],
-        });
-      });
-
-      if (customGroups.size) {
-        // Order tabs deterministically: named categories alphabetically,
-        // with the uncategorized "Custom" group last (insertion order would
-        // otherwise be arbitrary from the admin's perspective).
-        const groups = Array.from(customGroups.entries()).sort(([a], [b]) => {
-          if (a === '') return 1;
-          if (b === '') return -1;
-          return a.localeCompare(b);
-        });
-
-        groups.forEach(([name, group], i) => {
-          // Assign an opaque id here rather than deriving one from the
-          // freeform category text: the uncategorized group keeps the bare
-          // id, named groups get an index suffix. All share the
-          // `flamoji_custom` prefix that the sticker-mode filter relies on,
-          // and none can collide with a built-in emoji-mart category id.
-          group.id = name === '' ? 'flamoji_custom' : 'flamoji_custom_' + i;
-          customEmojis.push(group);
-
-          // emoji-mart's `categories` prop is an explicit allow-list; a
-          // custom group whose id isn't listed is silently hidden. These
-          // ids are freshly generated, so just append them.
-          specifiedCategories.push(group.id);
-        });
-      }
-
-      const autoHide = !!app.forum.attribute('flamoji.auto_hide');
-      const showRecents = !!app.forum.attribute('flamoji.show_recents');
-      const showPreview = !!app.forum.attribute('flamoji.show_preview');
-      const showSearch = !!app.forum.attribute('flamoji.show_search');
-      const showVariants = !!app.forum.attribute('flamoji.show_variants');
-      const showCategoryButtons = !!app.forum.attribute('flamoji.show_category_buttons');
-      const stickerMode = !!app.forum.attribute('flamoji.sticker_mode');
-      // Sticker mode only enlarges custom emoji, so on a forum with no custom
-      // emoji it would just leave a sticker-sized grid of normal unicode
-      // emoji. Gate the entire behaviour (category filter, enlarged grid,
-      // responsive popup) on having at least one custom group.
-      const effectiveStickerMode = stickerMode && customGroups.size > 0;
-
-      // emoji-mart's `categories` prop is an explicit allow-list. When
-      // showRecents is enabled, we still need 'frequent' on the list or
-      // the Frequently Used category is silently filtered out — even
-      // though maxFrequentRows > 0 would otherwise enable it. Prepend so
-      // it appears first as emoji-mart expects.
-      if (showRecents && specifiedCategories.indexOf('frequent') === -1) {
-        specifiedCategories.unshift('frequent');
-      }
-
-      // Sticker mode only enlarges custom emoji (the unicode set keeps its
-      // default size, since those render as fonts/sprites, not <img>). So
-      // when it's on, restrict the picker to the custom categories only —
-      // the built-in unicode tabs would otherwise sit at normal size amongst
-      // the stickers and just add noise. The Frequently Used tab is exempt:
-      // it stays driven by show_recents exactly like normal mode, so users
-      // keep quick access to their most-used stickers.
-      if (effectiveStickerMode) {
-        specifiedCategories = specifiedCategories.filter((id) => id === 'frequent' || id.indexOf('flamoji_custom') === 0);
-      }
-
-      // Match the picker's emoji rendering to what posts will actually
-      // display: the core flarum/emoji extension rewrites unicode to
-      // Twemoji <img>; without it, posts render OS-native glyphs. The
-      // `picker_set` admin setting can force one or the other; default
-      // `auto` follows whatever the core extension is doing.
-      const pickerSet = app.forum.attribute('flamoji.picker_set') || 'auto';
-      const hasEmojiExt = !!app.forum.attribute('flamoji.has_emoji_extension');
-      const useTwemoji = pickerSet === 'twemoji' || (pickerSet === 'auto' && hasEmojiExt);
-
-      // emoji-mart stores a per-browser Frequently Used index in localStorage
-      // ('emoji-mart.frequently'); when it's ABSENT it falls back to a
-      // hardcoded list of popular *unicode* defaults. Seed an empty index so
-      // those defaults never appear: Frequently Used should reflect the user's
-      // own picks (the standard picker convention), and the generic defaults
-      // are often emoji this picker can't even show (custom-only/sticker mode,
-      // deselected categories). The tab simply appears once the user picks
-      // their first emoji; real picks overwrite this seed normally.
-      if (showRecents) {
-        const FREQUENTLY_KEY = 'emoji-mart.frequently';
-        if (window.localStorage.getItem(FREQUENTLY_KEY) == null) {
-          window.localStorage.setItem(FREQUENTLY_KEY, JSON.stringify({}));
-        }
-      }
+      const { Picker, options, customEmojiReplacers, effectiveStickerMode, autoHide } = buildPickerConfig(emojiMartModule, dataModule, response);
 
       const picker = new Picker({
-        data,
-        custom: customEmojis,
-        categories: specifiedCategories,
-        i18n: buildI18n(),
-        // 'auto' tracks the user's OS color-scheme preference. Better than
-        // hardcoding 'light' on forums with dark themes — the picker would
-        // otherwise pop up bright-white against dark chrome.
-        theme: 'auto',
-        autoFocus: false,
-        set: useTwemoji ? 'twitter' : 'native',
-        ...(useTwemoji ? { getSpritesheetURL: () => TWEMOJI_SPRITESHEET_URL } : {}),
-        // Tile sizing. Default (perLine 9 / emojiSize 24 / emojiButtonSize
-        // 36) is emoji-mart's own. When sticker mode is on we enlarge the
-        // grid (see STICKER_GRID); note that larger emojiButtonSize can trip
-        // a WebKit sub-pixel IntersectionObserver bug in emoji-mart's NavBar
-        // that mis-highlights a category on click — acceptable for the
-        // opt-in sticker mode.
-        ...(effectiveStickerMode ? STICKER_GRID : {}),
-        previewPosition: showPreview ? 'bottom' : 'none',
-        searchPosition: showSearch ? 'sticky' : 'none',
-        // Custom emoji have a single image (no skin-tone variants), so the
-        // skin-tone selector is non-functional in sticker mode (which shows
-        // only custom emoji). Suppress it there regardless of the setting.
-        skinTonePosition: showVariants && !effectiveStickerMode ? 'preview' : 'none',
-        navPosition: showCategoryButtons ? 'top' : 'none',
-        maxFrequentRows: showRecents ? parseInt(app.forum.attribute('flamoji.frequent_rows'), 10) || 4 : 0,
+        ...options,
         onEmojiSelect: (emoji) => {
           // Built-in emoji: insert the native Unicode character. Custom emoji
           // (those we registered above) carry our own id; insert the
