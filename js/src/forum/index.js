@@ -11,6 +11,7 @@ import app from 'flarum/common/app';
 import Alert from 'flarum/common/components/Alert';
 import getEmojiCategories from '../common/utils/getEmojiCategories';
 import TextEditorButton from './components/TextEditorButton';
+import PickerLoader from './components/PickerLoader';
 import urlChecker from '../common/utils/urlChecker';
 
 export { default as extend } from './extend';
@@ -253,34 +254,42 @@ app.initializers.add(
     }
 
     function mountPickerLoader() {
-      if (this._flamojiLoader) return;
-      const loader = document.createElement('div');
-      loader.className = 'flamoji-picker-loader';
-      // Match the loader's footprint to the (responsive) sticker picker so
-      // the swap from placeholder to real picker isn't a size jump.
-      if (app.forum.attribute('flamoji.sticker_mode')) {
-        loader.classList.add('flamoji-picker-loader--sticker');
-      }
-      loader.setAttribute('role', 'status');
-      loader.setAttribute('aria-live', 'polite');
+      if (this._flamojiLoaderContainer) return;
+      // A bare body-level mount point; the PickerLoader component's own root
+      // element (`.flamoji-picker-loader`) becomes its firstChild and is what
+      // we position. Body-level so it escapes composer clipping like the picker.
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      this._flamojiLoaderContainer = container;
 
-      const spinner = document.createElement('div');
-      spinner.className = 'flamoji-picker-loader__spinner';
-      spinner.setAttribute('aria-hidden', 'true');
+      renderPickerLoader.call(this, 'loading', null);
 
-      const label = document.createElement('div');
-      label.className = 'flamoji-picker-loader__label';
-      label.textContent = app.translator.trans(t + 'composer.picker_loading', {}, true);
-
-      loader.appendChild(spinner);
-      loader.appendChild(label);
-      document.body.appendChild(loader);
-
-      this._flamojiLoader = loader;
-      this._flamojiLoaderReposition = () => positionElement.call(this, loader);
+      this._flamojiLoaderReposition = () => positionElement.call(this, this._flamojiLoader);
       window.addEventListener('resize', this._flamojiLoaderReposition);
       window.addEventListener('scroll', this._flamojiLoaderReposition, true);
-      positionElement.call(this, loader);
+      positionElement.call(this, this._flamojiLoader);
+    }
+
+    /**
+     * (Re)render the PickerLoader component into the body-level container in
+     * the given state ('loading' | 'error'). Mithril diffs across state swaps,
+     * so the `.flamoji-picker-loader` root element is reused — keeping the
+     * positioned node stable. Caches that node on `this._flamojiLoader`.
+     */
+    function renderPickerLoader(state, onRetry) {
+      const sticker = !!app.forum.attribute('flamoji.sticker_mode');
+      m.render(
+        this._flamojiLoaderContainer,
+        m(PickerLoader, {
+          state,
+          sticker,
+          onRetry,
+          loadingLabel: app.translator.trans(t + 'composer.picker_loading', {}, true),
+          errorLabel: app.translator.trans(t + 'composer.picker_load_error', {}, true),
+          retryLabel: app.translator.trans(t + 'composer.picker_load_retry', {}, true),
+        })
+      );
+      this._flamojiLoader = this._flamojiLoaderContainer.firstChild;
     }
 
     function unmountPickerLoader() {
@@ -289,20 +298,24 @@ app.initializers.add(
         window.removeEventListener('scroll', this._flamojiLoaderReposition, true);
         this._flamojiLoaderReposition = null;
       }
-      if (this._flamojiLoader) {
+      if (this._flamojiLoaderContainer) {
         try {
-          this._flamojiLoader.remove();
+          // Unmount the component (runs its teardown), then drop the mount point.
+          m.render(this._flamojiLoaderContainer, []);
+          this._flamojiLoaderContainer.remove();
         } catch (e) {
           /* already detached */
         }
-        this._flamojiLoader = null;
+        this._flamojiLoaderContainer = null;
       }
+      this._flamojiLoader = null;
     }
 
     /**
-     * Replace the loader's spinner with an inline error card + Retry button.
-     * Complements the existing top-of-page Alert (which can be missed if the
-     * user is focused on the composer). Retry re-runs the same load path.
+     * Swap the loader into its error state: an inline error card + Retry
+     * button (declaratively rendered by PickerLoader). Complements the
+     * top-of-page Alert (which can be missed if the user is focused on the
+     * composer). Retry tears down the loader and re-runs the same load path.
      */
     function showLoaderError(retryCb) {
       // If the loader hasn't materialized yet (load failed faster than
@@ -311,28 +324,15 @@ app.initializers.add(
         clearTimeout(this._flamojiLoaderTimer);
         this._flamojiLoaderTimer = null;
       }
-      if (!this._flamojiLoader) mountPickerLoader.call(this);
+      if (!this._flamojiLoaderContainer) mountPickerLoader.call(this);
 
-      const loader = this._flamojiLoader;
-      loader.classList.add('flamoji-picker-loader--error');
-      loader.replaceChildren();
-
-      const label = document.createElement('div');
-      label.className = 'flamoji-picker-loader__label';
-      label.textContent = app.translator.trans(t + 'composer.picker_load_error', {}, true);
-
-      const retry = document.createElement('button');
-      retry.type = 'button';
-      retry.className = 'Button Button--primary flamoji-picker-loader__retry';
-      retry.textContent = app.translator.trans(t + 'composer.picker_load_retry', {}, true);
-      retry.addEventListener('click', () => {
+      const onRetry = () => {
         unmountPickerLoader.call(this);
         retryCb();
-      });
-
-      loader.appendChild(label);
-      loader.appendChild(retry);
-      positionElement.call(this, loader);
+      };
+      renderPickerLoader.call(this, 'error', onRetry);
+      // Error card is a different size than the spinner; re-clamp its position.
+      positionElement.call(this, this._flamojiLoader);
     }
 
     /**
