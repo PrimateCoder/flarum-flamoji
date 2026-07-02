@@ -213,8 +213,14 @@ export default function buildPickerConfig(emojiMartModule, dataModule, response)
     // otherwise pop up bright-white against dark chrome.
     theme: 'auto',
     autoFocus: false,
-    set: useTwemoji ? 'twitter' : 'native',
-    ...(useTwemoji ? { getSpritesheetURL: () => TWEMOJI_SPRITESHEET_URL } : {}),
+    // In sticker mode `data` is a lightweight skeleton with no unicode emoji
+    // beyond emoji-mart's built-in preview defaults (seeded as native glyphs).
+    // Force `native` there so those preview emoji render as OS glyphs; the
+    // sprite path would need the full dataset's sheet coords. Custom stickers
+    // render as <img> via their `src` regardless of `set`, so they're
+    // unaffected, and skin tones are already disabled in sticker mode.
+    set: effectiveStickerMode ? 'native' : useTwemoji ? 'twitter' : 'native',
+    ...(useTwemoji && !effectiveStickerMode ? { getSpritesheetURL: () => TWEMOJI_SPRITESHEET_URL } : {}),
     // Tile sizing. Default (perLine 9 / emojiSize 24 / emojiButtonSize 36) is
     // emoji-mart's own. When sticker mode is on we enlarge the grid (see
     // STICKER_GRID); note that larger emojiButtonSize can trip a WebKit

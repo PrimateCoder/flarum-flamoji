@@ -255,14 +255,106 @@ export default class PickerController {
   }
 
   _loadAndBuild() {
-    return Promise.all([
-      import(/* webpackChunkName: "emoji-mart" */ 'emoji-mart'),
-      import(/* webpackChunkName: "emoji-mart-data" */ '@emoji-mart/data/sets/15/twitter.json'),
-      app.request({
-        method: 'GET',
-        url: app.forum.attribute('apiUrl') + '/flamojis/all',
-      }),
-    ])
+    const useCdn = app.forum.attribute('flamoji.use_cdn');
+    const stickerMode = !!app.forum.attribute('flamoji.sticker_mode');
+
+    // --- emoji-mart library -----------------------------------------
+    // Local webpack chunk (the default) or, when CDN mode is on, an injected
+    // <script> exposing window.EmojiMart. On any CDN failure (network, or an
+    // SRI integrity mismatch) fall back to the bundled copy rather than
+    // leaving the picker broken.
+    const importLocalJs = () => import(/* webpackChunkName: "emoji-mart" */ 'emoji-mart');
+    let loadJs;
+    const cdnJsUrl = app.forum.attribute('flamoji.cdn_js_url');
+    if (useCdn && cdnJsUrl) {
+      const cdnJsSri = app.forum.attribute('flamoji.cdn_js_sri');
+      loadJs = new Promise((resolve, reject) => {
+        if (window.EmojiMart) return resolve(window.EmojiMart);
+        const script = document.createElement('script');
+        script.src = cdnJsUrl;
+        if (cdnJsSri) {
+          // SRI requires CORS; jsdelivr serves the proper headers. A hash
+          // mismatch makes the browser fire onerror (blocked), so we then
+          // fall back to the local bundle below.
+          script.integrity = cdnJsSri;
+          script.crossOrigin = 'anonymous';
+        }
+        script.onload = () =>
+          window.EmojiMart ? resolve(window.EmojiMart) : reject(new Error('emoji-mart CDN script loaded but window.EmojiMart is undefined'));
+        script.onerror = reject;
+        document.head.appendChild(script);
+      }).catch((err) => {
+        console.warn('[pianotell-flamoji] emoji-mart CDN load failed; falling back to local bundle:', err);
+        return importLocalJs();
+      });
+    } else {
+      loadJs = importLocalJs();
+    }
+
+    const loadApi = app.request({
+      method: 'GET',
+      url: app.forum.attribute('apiUrl') + '/flamojis/all',
+    });
+
+    // --- emoji dataset ----------------------------------------------
+    const importLocalData = () => import(/* webpackChunkName: "emoji-mart-data" */ '@emoji-mart/data/sets/15/twitter.json');
+
+    // Local chunk (default) or an integrity-checked CDN fetch, falling back to
+    // the bundled copy on any failure (network or SRI mismatch).
+    const loadUnicodeData = () => {
+      const cdnDataUrl = app.forum.attribute('flamoji.cdn_data_url');
+      if (useCdn && cdnDataUrl) {
+        const cdnDataSri = app.forum.attribute('flamoji.cdn_data_sri');
+        // fetch() enforces SRI when `integrity` is set: a mismatch rejects the
+        // promise, so tampered/wrong data can't reach the picker.
+        const opts = cdnDataSri ? { integrity: cdnDataSri } : {};
+        return fetch(cdnDataUrl, opts)
+          .then((res) => {
+            if (!res.ok) throw new Error('emoji-mart data CDN responded ' + res.status);
+            return res.json();
+          })
+          .catch((err) => {
+            console.warn('[pianotell-flamoji] emoji-mart data CDN load failed; falling back to local bundle:', err);
+            return importLocalData();
+          });
+      }
+      return importLocalData();
+    };
+
+    // In sticker mode we can skip the (heavy) unicode dataset entirely and feed
+    // the picker a tiny skeleton — but only when there is actually at least one
+    // custom emoji (effective sticker mode). That decision needs the custom-
+    // emoji count from the API, so gate the data load on it ONLY when sticker
+    // mode is enabled. When it's off (the common case), start the dataset load
+    // immediately, in parallel with the API — otherwise we needlessly serialize
+    // the 460KB dataset behind the API round-trip.
+    //
+    // emoji-mart's preview renders one of a few built-in default emoji
+    // depending on state: "point_up" (bottom idle), "point_down" (top idle),
+    // and "cry" (no search results). Seed all three as native glyphs so the
+    // preview is never blank in sticker mode, without pulling in the full
+    // dataset. They render natively (see the forced `set: 'native'` in
+    // buildPickerConfig); the sprite path would need the real dataset's sheet.
+    const STICKER_SKELETON = {
+      categories: [],
+      emojis: {
+        point_up: { id: 'point_up', name: 'Index Pointing Up', skins: [{ native: '☝️' }] },
+        point_down: { id: 'point_down', name: 'Backhand Index Pointing Down', skins: [{ native: '👇' }] },
+        cry: { id: 'cry', name: 'Crying Face', skins: [{ native: '😢' }] },
+      },
+      aliases: {},
+      sheet: { cols: 1, rows: 1 },
+    };
+    // The /all endpoint returns raw model objects keyed numerically, so the
+    // custom-emoji count is the number of numeric keys in the response.
+    const loadData = stickerMode
+      ? loadApi.then((response) => {
+          const customEmojisCount = Object.keys(response).filter((k) => !isNaN(k)).length;
+          return customEmojisCount > 0 ? STICKER_SKELETON : loadUnicodeData();
+        })
+      : loadUnicodeData();
+
+    return Promise.all([loadJs, loadData, loadApi])
       .then(([emojiMartModule, dataModule, response]) => {
         // Guard against the editor being torn down (composer closed, navigated
         // away) while chunks were downloading. Without this we'd append a

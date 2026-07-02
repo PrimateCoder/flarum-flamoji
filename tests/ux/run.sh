@@ -31,6 +31,7 @@ SPECS=(
   tests/ux/picker-variants.spec.mjs
   tests/ux/admin-baseline.spec.mjs
   tests/ux/picker-loading.spec.mjs
+  tests/ux/cdn.spec.mjs
 )
 
 # Auto-init the submodule on a fresh clone. Skip cleanly if the
