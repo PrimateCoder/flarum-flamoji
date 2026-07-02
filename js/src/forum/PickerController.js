@@ -25,23 +25,32 @@ const LOADER_DELAY_MS = 120;
 let webpackVersioned = false;
 
 /**
- * Owns the emoji-mart picker lifecycle for a single Flarum TextEditor: lazy
+ * Owns the emoji-mart picker lifecycle for a single Flarum composer: lazy
  * loading, the loading/error placeholder, the body-portaled Picker web
- * component, its positioning, and full teardown. One instance per editor,
- * created in the editor's `oninit` and disposed in `onremove`.
+ * component, its positioning, and full teardown. One instance per toolbar
+ * button — created in the FlamojiPickerButton component's `oninit` and
+ * disposed in its `onremove`, so the picker's lifetime is scoped to the button
+ * that opens it (no TextEditor.prototype patching, no `_flamoji*` state on the
+ * editor).
+ *
+ * The controller talks to its host (the button component) through a tiny
+ * interface — `getButtonElement()` and `insertText()` — rather than reaching
+ * into TextEditor/composer internals.
  *
  * emoji-mart's `Picker` is an imperative Web Component (its own Shadow DOM)
  * mounted on document.body to escape the composer footer's `overflow: auto`
  * clipping, so this integration is unavoidably imperative — but it lives here,
- * cohesively, instead of being scattered across TextEditor.prototype hooks and
- * `_flamoji*` instance properties.
+ * cohesively, in one place.
  */
 export default class PickerController {
-  constructor(editor) {
-    this.editor = editor;
+  constructor(host) {
+    // The host provides getButtonElement() (the positioning anchor + focus
+    // target) and insertText() (insert a shortcode / native emoji at the
+    // cursor). It is the FlamojiPickerButton component, whose own Mithril
+    // lifecycle owns this controller — decoupling us from TextEditor.prototype.
+    this.host = host;
 
     this.picker = null;
-    this.flamojiButton = null;
 
     this.isLoading = false;
     this.isLoaded = false;
@@ -63,18 +72,15 @@ export default class PickerController {
     this._setWebpackPublicPath();
   }
 
-  /** Cache the toolbar button element (called from the editor's oncreate/onupdate). */
-  cacheButton() {
-    if (this.editor.element) {
-      this.flamojiButton = this.editor.element.querySelector('.Button-flamoji');
-    }
+  /** The toolbar button element (positioning anchor + focus target). */
+  _button() {
+    return this.host.getButtonElement();
   }
 
-  _ensureButton() {
-    if (!this.flamojiButton && this.editor.element) {
-      this.flamojiButton = this.editor.element.querySelector('.Button-flamoji');
-    }
-    return this.flamojiButton;
+  /** Whether the host button is still attached to the document. */
+  _isConnected() {
+    const btn = this._button();
+    return !!(btn && btn.isConnected);
   }
 
   _setWebpackPublicPath() {
@@ -93,10 +99,11 @@ export default class PickerController {
    */
   position(el) {
     if (!el) return;
-    const button = this._ensureButton();
+    const button = this._button();
     if (!button) return;
-    const editorEl = this.editor.element;
-    const composerEl = editorEl ? editorEl.closest('.ComposerBody') || editorEl : null;
+    // Fallback anchor for the edge case where a button-centered popup won't
+    // fit: the composer body, else the editor root, else the button itself.
+    const composerEl = button.closest('.ComposerBody') || button.closest('.TextEditor') || button;
     positionPopup(el, button, composerEl);
   }
 
@@ -114,7 +121,7 @@ export default class PickerController {
     this._loaderTimer = setTimeout(() => {
       this._loaderTimer = null;
       // Editor torn down or load already finished while we were waiting.
-      if (!this.editor.element || !this.editor.element.isConnected) return;
+      if (!this._isConnected()) return;
       if (!this.isLoading) return;
       this.mountLoader();
     }, LOADER_DELAY_MS);
@@ -260,7 +267,7 @@ export default class PickerController {
         // away) while chunks were downloading. Without this we'd append a
         // picker to document.body that nothing references and leak listeners on
         // a detached editor element.
-        if (!this.editor.element || !this.editor.element.isConnected) {
+        if (!this._isConnected()) {
           this.isLoading = false;
           this.unmountLoader();
           return;
@@ -308,7 +315,7 @@ export default class PickerController {
         // expands at render time.
         const insert = customEmojiReplacers[emoji.id] || emoji.native || '';
         if (!insert) return;
-        this.editor.attrs.composer.editor.insertAtCursor(insert);
+        this.host.insertText(insert);
 
         if (autoHide) {
           this.isVisible = false;
@@ -320,7 +327,8 @@ export default class PickerController {
         // we have it hidden. Gate on our own visibility flag, and ignore the
         // click that opened us.
         if (!this.isVisible) return;
-        if (this.flamojiButton && this.flamojiButton.contains(event.target)) return;
+        const btn = this._button();
+        if (btn && btn.contains(event.target)) return;
         this.isVisible = false;
         this.picker.style.display = 'none';
       },
@@ -367,7 +375,8 @@ export default class PickerController {
       event.stopPropagation();
       this.isVisible = false;
       this.picker.style.display = 'none';
-      if (this.flamojiButton) this.flamojiButton.focus();
+      const btn = this._button();
+      if (btn) btn.focus();
     };
     document.addEventListener('keydown', this._keydown, true);
 
@@ -418,6 +427,5 @@ export default class PickerController {
     this.picker = null;
     this.isLoaded = false;
     this.isVisible = false;
-    this.flamojiButton = null;
   }
 }

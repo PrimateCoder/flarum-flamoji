@@ -8,8 +8,7 @@
 import { extend } from 'flarum/common/extend';
 
 import app from 'flarum/common/app';
-import TextEditorButton from './components/TextEditorButton';
-import PickerController from './PickerController';
+import FlamojiPickerButton from './components/FlamojiPickerButton';
 
 export { default as extend } from './extend';
 
@@ -32,28 +31,14 @@ app.initializers.add(
       }
     });
 
-    // Each TextEditor gets its own PickerController, which owns the entire
-    // picker lifecycle (lazy load, loading placeholder, the body-portaled
-    // emoji-mart Web Component, positioning, and teardown). The editor's
-    // lifecycle hooks below just delegate to it.
-    extend('flarum/common/components/TextEditor', 'oninit', function () {
-      this.flamojiPicker = new PickerController(this);
-    });
-
-    extend('flarum/common/components/TextEditor', ['oncreate', 'onupdate'], function () {
-      this.flamojiPicker.cacheButton();
-    });
-
-    extend('flarum/common/components/TextEditor', 'onremove', function () {
-      if (this.flamojiPicker) this.flamojiPicker.dispose();
-    });
-
+    // Add the flamoji toolbar button. The button component owns the entire
+    // picker lifecycle itself (via its own oninit/onremove → PickerController),
+    // so the editor needs no other lifecycle patching.
     extend('flarum/common/components/TextEditor', 'toolbarItems', function (items) {
       items.add(
         'flamoji',
-        TextEditorButton.component({
-          onclick: () => this.flamojiPicker.toggle(),
-          icon: this.flamojiPicker.isLoading ? 'fas fa-spinner fa-pulse' : 'far fa-smile-wink',
+        FlamojiPickerButton.component({
+          composer: this.attrs.composer,
           title: app.translator.trans(t + 'composer.emoji_tooltip', {}, true),
         })
       );
