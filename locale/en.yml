@@ -78,6 +78,7 @@ pianotell-flamoji:
 
       emoji_list:
         load_more_button: => core.forum.post_stream.load_more_button
+        uncategorized: Uncategorized
 
   # Translations in this namespace are used by the forum user interface.
   forum:
