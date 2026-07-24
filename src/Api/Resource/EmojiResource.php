@@ -79,9 +79,11 @@ class EmojiResource extends AbstractDatabaseResource
                 ->authenticated()
                 ->admin()
                 ->action(function (Context $context) {
-                    $data = Arr::get($context->body(), 'data', []);
+                    $body = $context->body();
+                    $data = Arr::get($body, 'data', []);
+                    $mode = Arr::get($body, 'mode', 'append');
 
-                    return $this->handleImport($data);
+                    return $this->handleImport($data, $mode);
                 })
                 ->response(fn (Context $context, mixed $data) => new JsonResponse([
                     'legacyShortcodes' => $data,
@@ -185,7 +187,7 @@ class EmojiResource extends AbstractDatabaseResource
      * @return list<string> the non-canonical ("legacy") shortcodes that were
      *                      imported as-is, for a non-blocking admin notice
      */
-    private function handleImport(array $data): array
+    private function handleImport(array $data, string $mode = 'append'): array
     {
         $errors = [];
         $normalized = [];
@@ -193,7 +195,7 @@ class EmojiResource extends AbstractDatabaseResource
         $legacyShortcodes = [];
 
         // Pre-load existing triggers for duplicate detection
-        $existingTriggers = Emoji::pluck('text_to_replace')->filter()->all();
+        $existingTriggers = $mode === 'override' ? [] : Emoji::pluck('text_to_replace')->filter()->all();
 
         foreach ($data as $i => $emojiData) {
             try {
@@ -232,7 +234,11 @@ class EmojiResource extends AbstractDatabaseResource
             throw new ValidationException($errors);
         }
 
-        $this->db->transaction(function () use ($normalized) {
+        $this->db->transaction(function () use ($normalized, $mode) {
+            if ($mode === 'override') {
+                Emoji::query()->delete();
+            }
+
             foreach ($normalized as $row) {
                 $emoji = Emoji::build(
                     $row['title'],

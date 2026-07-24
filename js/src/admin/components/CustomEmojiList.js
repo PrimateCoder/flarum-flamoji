@@ -67,6 +67,29 @@ export default class CustomEmojiList extends Component {
       });
   }
 
+  exportCategory(categoryName, emojis) {
+    const exportData = {
+      [categoryName]: emojis.map((emoji) => ({
+        title: emoji.title(),
+        text_to_replace: emoji.textToReplace(),
+        category: emoji.category(),
+        path: emoji.path(),
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `flamoji-${categoryName.toLowerCase().replace(/[^a-z0-9]/g, '_')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  }
+
   view() {
     const state = app.customEmojiListState;
     const uncategorized = this.getUncategorizedTranslation();
@@ -131,6 +154,12 @@ export default class CustomEmojiList extends Component {
                       className="Button Button--icon Button--link customEmoji-categoryEditButton"
                       icon="fas fa-pencil-alt"
                       onclick={() => this.startEditingCategory(category)}
+                    />
+                    <Button
+                      className="Button Button--icon Button--link customEmoji-categoryExportButton"
+                      icon="fas fa-file-export"
+                      title={app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.export_json_button')}
+                      onclick={() => this.exportCategory(category, groupedEmojis[category])}
                     />
                     {this.isUpdatingCategory === category ? <LoadingIndicator display="inline" size="small" /> : ''}
                   </span>

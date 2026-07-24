@@ -5,13 +5,11 @@
  * LICENSE file that was distributed with this source code.
  */
 
-import { saveAs } from 'file-saver';
 import Button from 'flarum/common/components/Button';
 import app from 'flarum/common/app';
 import Component from 'flarum/common/Component';
 import CustomEmojiList from './CustomEmojiList';
-import EditEmojiModal from './EditEmojiModal';
-import listItems from 'flarum/common/helpers/listItems';
+import ImportEmojisModal from './ImportEmojisModal';
 import ItemList from 'flarum/common/utils/ItemList';
 
 // sessionStorage key used to carry a post-import notice across the page
@@ -45,66 +43,60 @@ export default class CustomEmojiSection extends Component {
   }
 
   exportEmojiList() {
-    var customEmojiList = {};
+    app
+      .request({ method: 'GET', url: `${app.forum.attribute('apiUrl')}/flamojis/all` })
+      .then((response) => {
+        let emojis = [];
+        if (Array.isArray(response)) {
+          emojis = response;
+        } else if (response && typeof response === 'object') {
+          emojis = Object.keys(response)
+            .filter((k) => !isNaN(k))
+            .map((k) => response[k]);
+        }
 
-    app.request({ method: 'GET', url: `${app.forum.attribute('apiUrl')}/flamojis/all` }).then((response) => {
-      const emojis = Object.keys(response)
-        .filter((k) => !isNaN(k))
-        .map((k) => response[k]);
-      emojis.map((emoji, i) => {
-        customEmojiList[i] = {
-          title: emoji.title,
-          text_to_replace: emoji.text_to_replace,
-          category: emoji.category,
-          path: emoji.path,
-        };
+        if (emojis.length === 0) {
+          app.alerts.show({ type: 'warning' }, app.translator.trans('core.forum.post_stream.no_results'));
+          return;
+        }
+
+        const uncategorized = app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.emoji_list.uncategorized', {}, true);
+        const uncategorizedStr = Array.isArray(uncategorized) ? uncategorized.join('') : String(uncategorized || 'Uncategorized');
+
+        const groupedEmojis = {};
+        emojis.forEach((emoji) => {
+          let cat = (emoji.category || '').trim();
+          if (!cat) cat = uncategorizedStr;
+
+          if (!groupedEmojis[cat]) groupedEmojis[cat] = [];
+          groupedEmojis[cat].push({
+            title: emoji.title,
+            text_to_replace: emoji.text_to_replace,
+            category: emoji.category,
+            path: emoji.path,
+          });
+        });
+
+        const blob = new Blob([JSON.stringify(groupedEmojis, null, 2)], { type: 'application/json;charset=utf-8' });
+        const blobUrl = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = 'flamoji.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      })
+      .catch((err) => {
+        app.alerts.show({ type: 'error' }, 'Failed to export emojis.');
+        console.error(err);
       });
-
-      var blob = new Blob([JSON.stringify(customEmojiList)], { type: 'application/json;charset=utf-8' });
-      saveAs(blob, 'flamoji.json');
-    });
   }
 
   importEmojiList() {
-    if (!confirm(app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.import_emojis_message', {}, true))) return;
-
-    var input = document.createElement('input');
-    input.type = 'file';
-
-    input.onchange = (e) => {
-      app.customEmojiListState.loading = true;
-
-      // getting a hold of the file reference
-      var file = e.target.files[0];
-
-      // setting up the reader
-      var reader = new FileReader();
-      reader.readAsText(file, 'UTF-8');
-
-      // here we tell the reader what to do when it's done reading...
-      reader.onload = (readerEvent) => {
-        app
-          .request({
-            method: 'POST',
-            url: `${app.forum.attribute('apiUrl')}/flamojis/import`,
-            body: { data: JSON.parse(readerEvent.target.result) },
-          })
-          .then((response) => {
-            const legacy = (response && response.legacyShortcodes) || [];
-            if (Array.isArray(legacy) && legacy.length) {
-              // Stash for after the reload below.
-              try {
-                sessionStorage.setItem(IMPORT_NOTICE_KEY, JSON.stringify(legacy));
-              } catch (e) {
-                // non-fatal
-              }
-            }
-            EditEmojiModal.prototype.clearCache().then(() => window.location.reload());
-          });
-      };
-    };
-
-    input.click();
+    app.modal.show(ImportEmojisModal);
   }
 
   flamojiTopItems() {
@@ -112,14 +104,14 @@ export default class CustomEmojiSection extends Component {
 
     items.add(
       'import',
-      <Button icon="fas fa-sign-in-alt" onclick={() => this.importEmojiList()}>
+      <Button className="Button" icon="fas fa-file-import" onclick={() => this.importEmojiList()}>
         {app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.import_json_button')}
       </Button>
     );
 
     items.add(
       'export',
-      <Button icon="fas fa-share" onclick={() => this.exportEmojiList()}>
+      <Button className="Button" icon="fas fa-file-export" onclick={() => this.exportEmojiList()}>
         {app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.export_json_button')}
       </Button>
     );
@@ -136,8 +128,8 @@ export default class CustomEmojiSection extends Component {
               <div className="ExtensionName">
                 <h2>{app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.heading_title')}</h2>
               </div>
-              <div class="ExtensionPage-headerTopItems">
-                <ul>{listItems(this.flamojiTopItems().toArray())}</ul>
+              <div className="ExtensionPage-headerTopItems">
+                <div className="ButtonGroup">{this.flamojiTopItems().toArray()}</div>
               </div>
             </div>
           </div>
