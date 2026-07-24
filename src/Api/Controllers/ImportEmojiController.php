@@ -33,11 +33,15 @@ class ImportEmojiController implements RequestHandlerInterface
     {
         RequestUtil::getActor($request)->assertAdmin();
 
+        $body = $request->getParsedBody();
+        $data = Arr::get($body, 'data', []);
+        $mode = Arr::get($body, 'mode', 'append');
+
         // The handler returns the non-canonical ("legacy") shortcodes that
         // were imported as-is, so the admin UI can surface a non-blocking
         // notice. Older clients ignore the body.
         $legacyShortcodes = $this->bus->dispatch(
-            new ImportEmoji(Arr::get($request->getParsedBody(), 'data', []))
+            new ImportEmoji($data, $mode)
         );
 
         return new JsonResponse(['legacyShortcodes' => $legacyShortcodes], 200);
