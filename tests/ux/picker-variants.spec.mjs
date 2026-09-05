@@ -36,7 +36,7 @@ async function openPicker(page) {
       const sr = p?.shadowRoot;
       if (!sr) return false;
       return sr.querySelectorAll('.category button').length > 3;
-    },
+    }, null,
     { timeout: 10_000 }
   );
   await page.waitForTimeout(800);
@@ -300,7 +300,9 @@ await runSpec({
       const diffs = Object.keys(expected)
         .filter((k) => JSON.stringify(expected[k]) !== JSON.stringify(snap[k]));
       check(`${variant.id} — structural baseline matches`, diffs.length === 0,
-        diffs.length ? `keys differ: ${diffs.join(', ')}` : '');
+        diffs.length
+          ? `keys differ: ${diffs.join(', ')}; expected=${JSON.stringify(Object.fromEntries(diffs.map((k) => [k, expected[k]])))} actual=${JSON.stringify(Object.fromEntries(diffs.map((k) => [k, snap[k]])))}`
+          : '');
     }
 
     // Pixel baseline

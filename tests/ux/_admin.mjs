@@ -214,7 +214,7 @@ export async function applySettings(page, overrides, baseUrl) {
             /save changes/i.test(b.textContent || "")
           );
           return btn && btn.disabled;
-        },
+        }, null,
         { timeout: 8_000 }
       );
       return true;
@@ -261,39 +261,118 @@ export async function listCustomEmojiShortcodes(page) {
 // list to gain our new row. `path` accepts any URL or data URI — the
 // admin UI doesn't validate it. `category` is optional (freeform).
 //
-// Note: the modal re-renders on every keystroke (the modal title binds
-// to the live emojiTitle stream), so previously-resolved input handles
-// can become detached. Re-query before each fill to be safe.
-//
-// Field order follows the EditEmojiModal ItemList priorities:
-//   0 = title (50), 1 = shortcode (40), 2 = category (35), 3 = path (30).
+// Fields are located by their visible LABEL text, not by DOM index:
+// the modal re-renders on every keystroke (the modal title binds to
+// the live emojiTitle stream) and index-based filling has raced with
+// that re-render under load, landing values in the wrong inputs (a
+// stuck modal with a "text to replace is required" validation error).
+// Label matching is stable across re-renders.
 export async function addCustomEmoji(
   page,
   { title, shortcode, path, category }
 ) {
+  // Defensive: a stray open modal from a prior step would swallow the
+  // "+" click and make us fill a dead modal.
+  await closeStrayModal(page);
+
   await page.click(".customEmoji-addButton");
   await page.waitForSelector(".EditEmojiModal", { timeout: 10_000 });
 
-  for (const [idx, value] of [
-    [0, title],
-    [1, shortcode],
-    [2, category ?? ""],
-    [3, path],
-  ]) {
-    const input = await page.evaluateHandle((i) => {
-      return document.querySelectorAll(".EditEmojiModal .FormControl")[i];
-    }, idx);
-    const el = input.asElement();
-    if (!el) throw new Error(`EditEmojiModal input #${idx} not found`);
-    await el.fill(value);
-    await el.dispose();
+  // Read the current value of a modal field by its label.
+  const readField = (patternStr) =>
+    page.evaluate((p) => {
+      const rx = new RegExp(p, "i");
+      const group = [...document.querySelectorAll(".EditEmojiModal .Form-group")].find(
+        (g) => rx.test(g.querySelector("label")?.textContent || "")
+      );
+      return group?.querySelector("input.FormControl")?.value ?? null;
+    }, patternStr);
+
+  // Fill one field and verify it stuck. A Mithril redraw scheduled by a
+  // previous interaction can flush AFTER the fill and reset the input
+  // from its (empty) stream, silently undoing the fill. Detect that and
+  // re-fill after letting the redraw flush; each attempt is therefore
+  // "after settle", which is what finally makes it stick.
+  const fillVerified = async (patternStr, value) => {
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      const input = await page.evaluateHandle((p) => {
+        const rx = new RegExp(p, "i");
+        const group = [...document.querySelectorAll(".EditEmojiModal .Form-group")].find(
+          (g) => rx.test(g.querySelector("label")?.textContent || "")
+        );
+        return group ? group.querySelector("input.FormControl") : null;
+      }, patternStr);
+      const el = input.asElement();
+      if (!el) throw new Error(`EditEmojiModal field not found: /${patternStr}/`);
+      await el.fill(value);
+      await el.dispose();
+      await page.waitForTimeout(120); // let Mithril's async redraw flush
+      const held = await readField(patternStr);
+      if ((held ?? "") === value) return;
+      console.log(
+        `  [addCustomEmoji] field /${patternStr}/ lost its value (holds ${JSON.stringify(held)}); re-filling (attempt ${attempt})`
+      );
+    }
+    const held = await readField(patternStr);
+    throw new Error(
+      `EditEmojiModal fill for /${patternStr}/ did not stick after 4 attempts ` +
+      `(holds ${JSON.stringify(held)}, wanted ${JSON.stringify(value)})`
+    );
+  };
+
+  await fillVerified("emoji\\s*title", title);
+  await fillVerified("shortcode", shortcode);
+  await fillVerified("categor", category ?? "");
+  await fillVerified("path|url", path);
+
+  // Final pre-save verification: all four fields must hold their
+  // intended values after a last redraw settle. Retry the fill loop
+  // once if anything drifted, then fail with a precise message instead
+  // of a mysterious server-side "text to replace is required" error.
+  const intended = { title, shortcode, category: category ?? "", path };
+  const patterns = {
+    title: "emoji\\s*title",
+    shortcode: "shortcode",
+    category: "categor",
+    path: "path|url",
+  };
+  for (let round = 0; round < 2; round++) {
+    await page.waitForTimeout(150);
+    const actual = {
+      title: await readField(patterns.title),
+      shortcode: await readField(patterns.shortcode),
+      category: await readField(patterns.category),
+      path: await readField(patterns.path),
+    };
+    const drifted = Object.keys(intended).filter(
+      (k) => (actual[k] ?? "") !== intended[k]
+    );
+    if (drifted.length === 0) break;
+    if (round === 0) {
+      console.log(`  [addCustomEmoji] fields drifted before save: ${drifted.join(", ")}; re-filling`);
+      for (const k of drifted) await fillVerified(patterns[k], intended[k]);
+    } else {
+      throw new Error(
+        `EditEmojiModal fill verification failed before save: ` +
+        `expected ${JSON.stringify(intended)}, inputs hold ${JSON.stringify(actual)} ` +
+        `(Mithril redraw keeps resetting the modal).`
+      );
+    }
   }
 
   await page.click(".EditEmojiModal-save");
-  // Modal closes on success; list re-renders with the new row.
-  await page.waitForFunction(() => !document.querySelector(".EditEmojiModal"), {
-    timeout: 15_000,
-  });
+  // Modal closes on success; list re-renders with the new row. A server
+  // validation failure leaves the modal open — surface that distinctly.
+  await page
+    .waitForFunction(() => !document.querySelector(".EditEmojiModal"), null, {
+      timeout: 15_000,
+    })
+    .catch(() => {
+      throw new Error(
+        "EditEmojiModal did not close after Save (validation error or " +
+        "failed POST). Filled values were: " + JSON.stringify(actual)
+      );
+    });
   await page.waitForFunction(
     (sc) =>
       [...document.querySelectorAll(".customEmoji-image")].some(
@@ -304,10 +383,26 @@ export async function addCustomEmoji(
   );
 }
 
+// Close a modal left open by a previous failed step, if any. Tolerant:
+// no modal or a slow close simply moves on.
+export async function closeStrayModal(page) {
+  const had = await page.evaluate(() => !!document.querySelector(".Modal-backdrop"));
+  if (!had) return;
+  await page.evaluate(() => {
+    document.querySelector(".Modal-close .Button")?.click();
+  });
+  await page
+    .waitForFunction(() => !document.querySelector(".EditEmojiModal"), null, {
+      timeout: 5_000,
+    })
+    .catch(() => {});
+}
+
 // Open the edit modal for an existing row by shortcode, accept the
 // confirm dialog, click Delete, wait for the row to disappear.
 // Returns false if no row matches.
 export async function deleteCustomEmojiByShortcode(page, shortcode) {
+  await closeStrayModal(page);
   const found = await page.evaluate((sc) => {
     const img = [...document.querySelectorAll(".customEmoji-image")].find(
       (i) => i.getAttribute("title") === sc
@@ -326,7 +421,7 @@ export async function deleteCustomEmojiByShortcode(page, shortcode) {
   page.once("dialog", (d) => d.accept());
   await page.click(".EditEmojiModal-delete");
 
-  await page.waitForFunction(() => !document.querySelector(".EditEmojiModal"), {
+  await page.waitForFunction(() => !document.querySelector(".EditEmojiModal"), null, {
     timeout: 15_000,
   });
   await page.waitForFunction(
@@ -342,14 +437,29 @@ export async function deleteCustomEmojiByShortcode(page, shortcode) {
 
 // Delete every custom emoji in the admin list. Iterates until the list
 // is empty, so baseline specs start from a known-clean state regardless
-// of what prior specs left behind.
+// of what prior specs left behind. Throws if rows survive the loop so
+// the spec fails here instead of producing confusing downstream
+// structural/pixel mismatches.
 export async function deleteAllCustomEmojis(page, baseUrl) {
   await gotoAdmin(page, baseUrl);
   let shortcodes = await listCustomEmojiShortcodes(page);
+  const guard = new Set();
   while (shortcodes.length > 0) {
     for (const sc of shortcodes) {
+      if (guard.has(sc)) {
+        throw new Error(
+          `deleteAllCustomEmojis: row '${sc}' survived a delete attempt. ` +
+          `Remaining rows: ${JSON.stringify(shortcodes)}`
+        );
+      }
+      guard.add(sc);
       const deleted = await deleteCustomEmojiByShortcode(page, sc);
-      if (!deleted) break;
+      if (!deleted) {
+        throw new Error(
+          `deleteAllCustomEmojis: row '${sc}' not found while trying to delete. ` +
+          `Remaining rows: ${JSON.stringify(shortcodes)}`
+        );
+      }
     }
     shortcodes = await listCustomEmojiShortcodes(page);
   }

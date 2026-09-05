@@ -30,7 +30,7 @@ async function openPicker(page) {
     () => {
       const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
       return p?.shadowRoot?.querySelector('input[type="search"]') != null;
-    },
+    }, null,
     { timeout: 15_000 }
   );
   // Final settle: positionPicker / sticky category measurement.

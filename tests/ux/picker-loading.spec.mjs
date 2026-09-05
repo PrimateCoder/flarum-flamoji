@@ -92,7 +92,7 @@ await runSpec({
     () => {
       const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
       return p?.shadowRoot?.querySelector('input[type="search"]') != null;
-    },
+    }, null,
     { timeout: 15_000 }
   );
   const afterMount = await snapshotLoader(page);
@@ -163,7 +163,7 @@ await runSpec({
     () => {
       const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
       return p?.shadowRoot?.querySelector('input[type="search"]') != null;
-    },
+    }, null,
     { timeout: 15_000 }
   );
   const afterRetry = await snapshotLoader(page2);
@@ -298,7 +298,7 @@ await runSpec({
     () => {
       const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
       return p?.shadowRoot?.querySelector('input[type="search"]') != null;
-    },
+    }, null,
     { timeout: 15_000 }
   );
   // Close the picker popup (Escape) then re-open it.
