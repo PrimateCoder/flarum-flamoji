@@ -53,6 +53,63 @@ fi
 
 HARNESS=".pianotell/tests/ux/run.sh"
 
+CONTAINER="${PIANOTELL_FLARUM_UX_CONTAINER:-pianotell-web}"
+FLARUM_PATH="${PIANOTELL_FLARUM_UX_FLARUM_PATH:-/var/www/html}"
+PHP_USER="${PIANOTELL_FLARUM_UX_PHP_USER:-docker}"
+
+# ---------------------------------------------------------------------------
+# Precondition: the specs assert against Flarum core's TextEditor (a
+# <textarea> composer). If fof-rich-text (Tiptap/ProseMirror) is active,
+# the composer has no textarea and every composer-insert assertion reads
+# "" on both sides of the click. Disable it for the run and restore it
+# on exit, whatever the outcome.
+#
+# Uses Flarum's own console commands. `extension:disable` doubles as the
+# probe: exit 0 = was enabled (restore later); exit 1 "already disabled"
+# = nothing to do; exit 2 "no extensions by the ID" = not installed.
+# ---------------------------------------------------------------------------
+RICH_TEXT_WAS_ENABLED=0
+
+flarum_cli() {
+  docker exec -u "$PHP_USER" -w "$FLARUM_PATH" "$CONTAINER" \
+    php flarum "$@" 2>&1
+}
+
+ensure_core_text_editor() {
+  local out
+  if out="$(flarum_cli extension:disable fof-rich-text)"; then
+    RICH_TEXT_WAS_ENABLED=1
+    if ! flarum_cli cache:clear >/dev/null; then
+      echo "[flamoji] warning: cache:clear failed after disabling fof-rich-text" >&2
+    fi
+    echo "[flamoji] disabled fof-rich-text for this run (restored on exit)" >&2
+    return
+  fi
+  case "$out" in
+    *"already disabled"*) ;;
+    *"no extensions by the ID"*) ;;
+    *)
+      echo "[flamoji] warning: could not manage fof-rich-text ('$out'); continuing" >&2
+      ;;
+  esac
+}
+
+restore_rich_text() {
+  local out
+  if [[ $RICH_TEXT_WAS_ENABLED = 1 ]]; then
+    RICH_TEXT_WAS_ENABLED=0
+    if out="$(flarum_cli extension:enable fof-rich-text)" || [[ "$out" == *"already enabled"* ]]; then
+      flarum_cli cache:clear >/dev/null 2>&1 || true
+      echo "[flamoji] re-enabled fof-rich-text" >&2
+    else
+      echo "[flamoji] warning: failed to re-enable fof-rich-text ('$out'); enable it manually" >&2
+    fi
+  fi
+}
+trap restore_rich_text EXIT
+
+ensure_core_text_editor
+
 # Optional filter: match any spec whose basename contains $1.
 if [[ $# -gt 0 ]]; then
   filter="$1"
