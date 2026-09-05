@@ -46,18 +46,29 @@ export default class CustomEmojiList extends Component {
 
     this.isUpdatingCategory = oldCategory;
 
+    // The server renames EVERY emoji in the category in one atomic
+    // transaction — including rows the list has not loaded (it
+    // paginates). The "Uncategorized" group holds null-category rows
+    // and is addressed with from: null; real categories are addressed
+    // by their literal name. Literal strings are stored as data, so a
+    // category legitimately named "Uncategorized" survives a rename.
+    const from = oldCategory === uncategorized ? null : oldCategory;
+    const to = newName === '' ? null : newName;
+
     const state = app.customEmojiListState;
-    const emojisToUpdate = state.emojis.filter((emoji) => {
-      let cat = (emoji.category() || '').trim();
-      if (!cat) cat = uncategorized;
-      return cat === oldCategory;
-    });
 
-    const targetCategory = newName === '' || newName === uncategorized ? null : newName;
-
-    Promise.all(emojisToUpdate.map((emoji) => emoji.save({ category: targetCategory })))
+    app
+      .request({
+        method: 'POST',
+        url: `${app.forum.attribute('apiUrl')}/flamojis/rename-category`,
+        body: { from, to },
+      })
       .then(() => {
         this.isUpdatingCategory = null;
+        // Re-fetch the list: the server changed rows the local state
+        // may not have loaded.
+        state.emojis = [];
+        state.loadResults();
         m.redraw();
       })
       .catch((err) => {
@@ -94,8 +105,10 @@ export default class CustomEmojiList extends Component {
     const state = app.customEmojiListState;
     const uncategorized = this.getUncategorizedTranslation();
 
-    // Group emojis by category
-    const groupedEmojis = {};
+    // Group emojis by category. Null-prototype so a category literally
+    // named "__proto__" (freeform data, the server allows it) cannot
+    // hijack the grouping and crash the list.
+    const groupedEmojis = Object.create(null);
     state.emojis.forEach((emoji) => {
       let cat = (emoji.category() || '').trim();
       if (!cat) cat = uncategorized;
@@ -138,12 +151,17 @@ export default class CustomEmojiList extends Component {
                     this.saveCategory(category);
                   }}
                 >
-                  <input className="FormControl" value={this.newCategoryName} oninput={(e) => (this.newCategoryName = e.target.value)} />
+                  <input
+                    className="FormControl"
+                    value={this.newCategoryName}
+                    oninput={(e) => (this.newCategoryName = e.target.value)}
+                    maxlength="255"
+                  />
                   <Button type="submit" className="Button Button--primary" loading={this.isUpdatingCategory === category}>
-                    Save
+                    {app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.emoji_list.rename_save_button')}
                   </Button>
                   <Button className="Button" onclick={() => (this.editingCategory = null)}>
-                    Cancel
+                    {app.translator.trans('pianotell-flamoji.admin.custom_emojis_section.emoji_list.rename_cancel_button')}
                   </Button>
                 </form>
               ) : (
