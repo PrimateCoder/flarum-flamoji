@@ -266,6 +266,45 @@ const VARIANTS = [
         !snap.hasSkinToneButton);
     },
   },
+  {
+    id: 'sticker-multi-category',
+    label: 'sticker_mode=true with two named custom categories',
+    overrides: { ...DEFAULTS, sticker_mode: true },
+    // Combines the two individually-covered aspects — enlarged sticker
+    // grid and multiple named custom tabs — into one baseline: the
+    // picker must be custom-only AND show both named tabs side by side.
+    setup: async (page, baseUrl) => {
+      const cdn = 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/64';
+      await gotoAdmin(page, baseUrl);
+      await addCustomEmoji(page, { title: 'Party', shortcode: ':flamoji_stk2_party:', category: 'Memes', path: `${cdn}/1f389.png` });
+      await addCustomEmoji(page, { title: 'Fire', shortcode: ':flamoji_stk2_fire:', category: 'Memes', path: `${cdn}/1f525.png` });
+      await addCustomEmoji(page, { title: 'Thumbs Up', shortcode: ':flamoji_stk2_thumb:', category: 'Reactions', path: `${cdn}/1f44d.png` });
+      await addCustomEmoji(page, { title: 'Heart', shortcode: ':flamoji_stk2_heart:', category: 'Reactions', path: `${cdn}/2764-fe0f.png` });
+    },
+    teardown: async (page, baseUrl) => {
+      await gotoAdmin(page, baseUrl);
+      for (const sc of [
+        ':flamoji_stk2_party:', ':flamoji_stk2_fire:',
+        ':flamoji_stk2_thumb:', ':flamoji_stk2_heart:',
+      ]) {
+        await deleteCustomEmojiByShortcode(page, sc);
+      }
+    },
+    checks: (snap, check) => {
+      check('sticker-multi — picker visible', snap.visible);
+      check('sticker-multi — grid tiles enlarged (>= 70px)', snap.tileSize >= 70,
+        `tileSize=${snap.tileSize}`);
+      const BUILTINS = /smileys|people|animals & nature|food|activities|travel|objects|symbols|flags|frequent/i;
+      check('sticker-multi — restricted to custom categories',
+        snap.navLabels.length > 0 && !snap.navLabels.some((l) => BUILTINS.test(l)),
+        `nav=${JSON.stringify(snap.navLabels)}`);
+      check('sticker-multi — both named tabs present',
+        snap.navLabels.includes('Memes') && snap.navLabels.includes('Reactions'),
+        `nav=${JSON.stringify(snap.navLabels)}`);
+      check('sticker-multi — no skin-tone selector',
+        !snap.hasSkinToneButton);
+    },
+  },
 ];
 
 await runSpec({

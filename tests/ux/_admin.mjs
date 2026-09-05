@@ -275,6 +275,19 @@ export async function addCustomEmoji(
   // "+" click and make us fill a dead modal.
   await closeStrayModal(page);
 
+  // The list's async load puts a LoadingIndicator over the grid; if it
+  // is still up, the "+" click is blocked by the overlay.
+  await page
+    .waitForFunction(
+      () => {
+        const list = document.querySelector(".customEmoji-list");
+        return list && !list.querySelector(".LoadingIndicator-container");
+      },
+      null,
+      { timeout: 15_000 }
+    )
+    .catch(() => {});
+
   await page.click(".customEmoji-addButton");
   await page.waitForSelector(".EditEmojiModal", { timeout: 10_000 });
 
@@ -360,7 +373,19 @@ export async function addCustomEmoji(
     }
   }
 
-  await page.click(".EditEmojiModal-save");
+  // Save click can be intercepted by a lingering overlay while the
+  // page is under load — retry with a settle instead of aborting (the
+  // modal still holds the filled data).
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await page.click(".EditEmojiModal-save", { timeout: 10_000 });
+      break;
+    } catch (e) {
+      if (attempt === 3) throw e;
+      console.log(`  [addCustomEmoji] save click stalled (attempt ${attempt}); retrying`);
+      await page.waitForTimeout(1000);
+    }
+  }
   // Modal closes on success; list re-renders with the new row. A server
   // validation failure leaves the modal open — surface that distinctly.
   await page
@@ -370,7 +395,7 @@ export async function addCustomEmoji(
     .catch(() => {
       throw new Error(
         "EditEmojiModal did not close after Save (validation error or " +
-        "failed POST). Filled values were: " + JSON.stringify(actual)
+        "failed POST). Check the server response and retry the spec."
       );
     });
   await page.waitForFunction(
@@ -400,8 +425,23 @@ export async function closeStrayModal(page) {
 
 // Open the edit modal for an existing row by shortcode, accept the
 // confirm dialog, click Delete, wait for the row to disappear.
-// Returns false if no row matches.
+// Returns false if no row matches. Retries the whole flow once if the
+// delete POST stalls (the modal then stays open — seen under load when
+// the delete request races other background requests).
 export async function deleteCustomEmojiByShortcode(page, shortcode) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const ok = await deleteCustomEmojiByShortcodeOnce(page, shortcode, attempt);
+    if (ok === true) return true;
+    if (ok === false) return false;
+    // 'retry' — fall through and try again.
+    console.log(`  [deleteCustomEmoji] attempt ${attempt} for ${shortcode} stalled; retrying`);
+  }
+  throw new Error(
+    `deleteCustomEmojiByShortcode: delete of ${shortcode} stalled after 2 attempts`
+  );
+}
+
+async function deleteCustomEmojiByShortcodeOnce(page, shortcode, attempt) {
   await closeStrayModal(page);
   const found = await page.evaluate((sc) => {
     const img = [...document.querySelectorAll(".customEmoji-image")].find(
@@ -412,55 +452,89 @@ export async function deleteCustomEmojiByShortcode(page, shortcode) {
     li?.querySelector(".customEmoji-editButton")?.click();
     return true;
   }, shortcode);
-  if (!found) return false;
+  if (!found) {
+    // Row may have actually been deleted by a stalled prior attempt.
+    return false;
+  }
 
-  await page.waitForSelector(".EditEmojiModal-delete", { timeout: 10_000 });
+  try {
+    await page.waitForSelector(".EditEmojiModal-delete", { timeout: 10_000 });
+  } catch (e) {
+    if (attempt < 2) return "retry";
+    throw e;
+  }
 
   // EditEmojiModal.delete() uses native window.confirm — auto-accept.
   // Register the handler before the click so we don't miss it.
   page.once("dialog", (d) => d.accept());
   await page.click(".EditEmojiModal-delete");
 
-  await page.waitForFunction(() => !document.querySelector(".EditEmojiModal"), null, {
-    timeout: 15_000,
-  });
-  await page.waitForFunction(
-    (sc) =>
-      ![...document.querySelectorAll(".customEmoji-image")].some(
-        (i) => i.getAttribute("title") === sc
-      ),
-    shortcode,
-    { timeout: 10_000 }
-  );
+  try {
+    await page.waitForFunction(
+      () => !document.querySelector(".EditEmojiModal"),
+      null,
+      { timeout: 15_000 }
+    );
+    await page.waitForFunction(
+      (sc) =>
+        ![...document.querySelectorAll(".customEmoji-image")].some(
+          (i) => i.getAttribute("title") === sc
+        ),
+      shortcode,
+      { timeout: 10_000 }
+    );
+  } catch (e) {
+    if (attempt < 2) return "retry";
+    throw e;
+  }
   return true;
 }
 
-// Delete every custom emoji in the admin list. Iterates until the list
-// is empty, so baseline specs start from a known-clean state regardless
-// of what prior specs left behind. Throws if rows survive the loop so
-// the spec fails here instead of producing confusing downstream
-// structural/pixel mismatches.
+// Delete every custom emoji in the admin list. Runs in passes: delete
+// what the DOM shows, then re-navigate (a stalled-but-successful delete
+// leaves the DOM stale, so each pass re-renders from the server) until
+// the list is empty. Throws if the same row set survives two consecutive
+// passes, or if the list never renders, so specs fail here with a clear
+// message instead of producing confusing downstream mismatches.
 export async function deleteAllCustomEmojis(page, baseUrl) {
-  await gotoAdmin(page, baseUrl);
-  let shortcodes = await listCustomEmojiShortcodes(page);
-  const guard = new Set();
-  while (shortcodes.length > 0) {
-    for (const sc of shortcodes) {
-      if (guard.has(sc)) {
+  const seenPasses = new Set();
+  for (let pass = 0; pass < 5; pass++) {
+    await gotoAdmin(page, baseUrl);
+    // A crashed render (e.g. the __proto__ grouping bug) leaves the
+    // list frozen on its initial LoadingIndicator forever — the DOM
+    // then reports zero rows even though the DB is non-empty, and a
+    // silent "success" here would strand debris that poisons every
+    // later spec. Treat a spinner that never clears as a crash.
+    await page
+      .waitForFunction(
+        () => {
+          const list = document.querySelector(".customEmoji-list");
+          return list && !list.querySelector(".LoadingIndicator-container");
+        },
+        null,
+        { timeout: 10_000 }
+      )
+      .catch(() => {
         throw new Error(
-          `deleteAllCustomEmojis: row '${sc}' survived a delete attempt. ` +
-          `Remaining rows: ${JSON.stringify(shortcodes)}`
+          "deleteAllCustomEmojis: the custom-emoji list never finished " +
+          "rendering (frozen LoadingIndicator — likely a JS render crash)."
         );
-      }
-      guard.add(sc);
-      const deleted = await deleteCustomEmojiByShortcode(page, sc);
-      if (!deleted) {
-        throw new Error(
-          `deleteAllCustomEmojis: row '${sc}' not found while trying to delete. ` +
-          `Remaining rows: ${JSON.stringify(shortcodes)}`
-        );
-      }
+      });
+    const shortcodes = await listCustomEmojiShortcodes(page);
+    if (shortcodes.length === 0) return;
+    const key = shortcodes.slice().sort().join("|");
+    if (seenPasses.has(key)) {
+      throw new Error(
+        `deleteAllCustomEmojis: rows survived a full delete pass: ` +
+        `${JSON.stringify(shortcodes)}`
+      );
     }
-    shortcodes = await listCustomEmojiShortcodes(page);
+    seenPasses.add(key);
+    for (const sc of shortcodes) {
+      await deleteCustomEmojiByShortcode(page, sc);
+    }
   }
+  throw new Error(
+    "deleteAllCustomEmojis: list still non-empty after 5 delete passes"
+  );
 }
