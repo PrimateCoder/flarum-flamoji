@@ -68,7 +68,7 @@ async function openPicker(page) {
 
 async function pickerMounted(page) {
   await page.waitForSelector('em-emoji-picker.flamoji-picker-popup', { timeout: 20_000 });
-  await page.waitForFunction(() => document.querySelector('em-emoji-picker.flamoji-picker-popup')?.shadowRoot?.querySelector('input[type="search"]') != null, {
+  await page.waitForFunction(() => document.querySelector('em-emoji-picker.flamoji-picker-popup')?.shadowRoot?.querySelector('input[type="search"]') != null, null, {
     timeout: 20_000,
   });
 }

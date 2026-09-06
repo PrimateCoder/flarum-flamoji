@@ -35,7 +35,7 @@ async function openPicker(page) {
       if (!p) return false;
       const r = p.getBoundingClientRect();
       return r.width > 0 && r.height > 0;
-    },
+    }, null,
     { timeout: 10_000 }
   );
   // Final settle: positionPicker runs from a ResizeObserver which fires

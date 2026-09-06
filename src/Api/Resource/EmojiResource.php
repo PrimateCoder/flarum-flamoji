@@ -79,12 +79,43 @@ class EmojiResource extends AbstractDatabaseResource
                 ->authenticated()
                 ->admin()
                 ->action(function (Context $context) {
-                    $data = Arr::get($context->body(), 'data', []);
+                    $body = $context->body();
+                    $data = Arr::get($body, 'data', []);
+                    $mode = Arr::get($body, 'mode', 'append');
 
-                    return $this->handleImport($data);
+                    return $this->handleImport($data, $mode);
                 })
                 ->response(fn (Context $context, mixed $data) => new JsonResponse([
                     'legacyShortcodes' => $data,
+                ], 200)),
+
+            // Bulk category rename: renames EVERY emoji whose stored
+            // category matches `from` in a single UPDATE statement.
+            // The admin list paginates, so the previous client-side
+            // fan-out of per-emoji PATCHes silently missed emojis on
+            // unloaded pages and failed non-atomically. `from: null`
+            // addresses uncategorized rows; `to: null` clears the
+            // category. Literal strings are stored as data — including
+            // "Uncategorized" — so admins keep ownership of their names.
+            Endpoint\Endpoint::make('rename-category')
+                ->route('POST', '/rename-category')
+                ->authenticated()
+                ->admin()
+                ->action(function (Context $context) {
+                    $body = $context->body();
+                    $from = Arr::get($body, 'from');
+                    $to = Arr::get($body, 'to');
+
+                    foreach (['from', 'to'] as $key) {
+                        if ($$key !== null && ! is_string($$key)) {
+                            throw new ValidationException([$key => 'Must be a string or null.']);
+                        }
+                    }
+
+                    return $this->handleRenameCategory($from, $to);
+                })
+                ->response(fn (Context $context, mixed $data) => new JsonResponse([
+                    'updated' => $data,
                 ], 200)),
         ];
     }
@@ -179,13 +210,49 @@ class EmojiResource extends AbstractDatabaseResource
     }
 
     /**
+     * All-or-nothing bulk category rename. A single UPDATE statement —
+     * inherently atomic, and no per-row model saves (which both N+1
+     * on big categories and, through the resource's normal hooks,
+     * re-validate each row needlessly — the target value is validated
+     * once here).
+     *
+     * @return int the number of emojis updated
+     */
+    private function handleRenameCategory(?string $from, ?string $to): int
+    {
+        $to = trim((string) $to);
+        if ($to !== '') {
+            $err = EmojiRules::validateCategory($to);
+            if ($err !== null) {
+                throw new ValidationException(['category' => $err]);
+            }
+        } else {
+            $to = null;
+        }
+        // Normalize like `to` and like the saving() hook does: '' is
+        // treated as "uncategorized" everywhere. No stored category can
+        // ever be the empty string (saving() normalizes it to null), so
+        // without this a from:'' would be a confusing silent no-op.
+        $from = $from === null || trim($from) === '' ? null : trim($from);
+
+        $query = Emoji::query();
+        if ($from === null) {
+            $query->whereNull('category');
+        } else {
+            $query->where('category', $from);
+        }
+
+        return $query->update(['category' => $to]);
+    }
+
+    /**
      * All-or-nothing bulk import. Validates every row before persisting
      * any, and wraps persistence in a DB transaction.
      *
      * @return list<string> the non-canonical ("legacy") shortcodes that were
      *                      imported as-is, for a non-blocking admin notice
      */
-    private function handleImport(array $data): array
+    private function handleImport(array $data, string $mode = 'append'): array
     {
         $errors = [];
         $normalized = [];
@@ -193,7 +260,7 @@ class EmojiResource extends AbstractDatabaseResource
         $legacyShortcodes = [];
 
         // Pre-load existing triggers for duplicate detection
-        $existingTriggers = Emoji::pluck('text_to_replace')->filter()->all();
+        $existingTriggers = $mode === 'override' ? [] : Emoji::pluck('text_to_replace')->filter()->all();
 
         foreach ($data as $i => $emojiData) {
             try {
@@ -232,7 +299,11 @@ class EmojiResource extends AbstractDatabaseResource
             throw new ValidationException($errors);
         }
 
-        $this->db->transaction(function () use ($normalized) {
+        $this->db->transaction(function () use ($normalized, $mode) {
+            if ($mode === 'override') {
+                Emoji::query()->delete();
+            }
+
             foreach ($normalized as $row) {
                 $emoji = Emoji::build(
                     $row['title'],

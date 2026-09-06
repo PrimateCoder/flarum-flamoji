@@ -67,7 +67,7 @@ async function openPicker(page) {
         sr &&
         (sr.querySelector(".category button") || sr.querySelector("nav button"))
       );
-    },
+    }, null,
     { timeout: 15_000 }
   );
   await page.waitForTimeout(300);

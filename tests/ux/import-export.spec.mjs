@@ -3,32 +3,33 @@
 // Spec:    tests/ux/import-export.md
 // Runtime: node tests/ux/import-export.spec.mjs
 //
-// What this proves
-// ----------------
+// What this proves (2.x grouped export/import contract)
+// -----------------------------------------------------
 // * Clicking the admin "Export JSON" button downloads a flamoji.json
-//   payload whose schema matches what the import endpoint accepts.
-// * Clicking the admin "Import JSON" button, confirming the dialog,
-//   and selecting a JSON file containing a fresh emoji actually
-//   creates that emoji on the forum.
-// * Round-trip: export, edit JSON to add one row, re-import; verify the
-//   exported file's existing rows survive and the new one appears.
+//   payload in the grouped schema { "<category>": [row, ...] } where
+//   every row carries {title, text_to_replace, category, path}.
+// * The import modal accepts BOTH shapes:
+//     - the legacy flat array (back-compat with pre-grouping exports),
+//     - the new grouped object written by the exporter.
+// * Additive import (append mode) keeps every pre-existing row.
+// * Override mode (switch + confirm checkbox) replaces the entire
+//   custom-emoji set with the imported payload.
 //
-// All operations go through the admin UI buttons — no REST shortcuts.
-// The download is captured via Playwright's `download` event; the
-// upload is fed via the `filechooser` event triggered by the
-// programmatic <input type="file"> the admin code creates.
+// All operations go through the admin UI buttons and the Import JSON
+// modal — no REST shortcuts. The download is captured via Playwright's
+// `download` event; imports are typed into the modal's textarea and
+// observed via the /flamojis/import network response.
 //
-// Cleanup: any imported fixture rows are removed via the admin Delete
-// button at end of test, regardless of pass/fail.
+// Cleanup: all custom emojis are removed via the admin Delete button at
+// end of test, regardless of pass/fail.
 
-import { writeFileSync, readFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runSpec } from '../../.pianotell/tests/ux/helpers.mjs';
 import {
   gotoAdmin,
   addCustomEmoji,
-  deleteCustomEmojiByShortcode,
   deleteAllCustomEmojis,
   listCustomEmojiShortcodes,
 } from './_admin.mjs';
@@ -41,18 +42,59 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const PNG_DATA_URI =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
-const IMPORT_FIXTURE_TITLE = 'Flamoji Import Fixture';
-const IMPORT_FIXTURE_SHORTCODE = ':flamoji_import_fixture:';
+// Open the Import JSON modal, paste the payload into its textarea,
+// optionally arm override mode (switch + confirm checkbox), submit, and
+// wait for the POST /flamojis/import response. Returns the response.
+// The caller is responsible for re-navigating afterwards (the handler
+// reloads the page, which can race under load).
+async function importViaModal(page, payloadJson, { override = false } = {}) {
+  const importBtn = page.locator('.ExtensionPage-headerTopItems button', {
+    hasText: 'Import JSON',
+  });
+  await importBtn.waitFor({ timeout: 10_000 });
+  await importBtn.click();
+  await page.waitForSelector('.Flamoji-ImportEmojisModal', { timeout: 10_000 });
+
+  const importResponse = page.waitForResponse(
+    (resp) => resp.url().includes('/flamojis/import'),
+    { timeout: 15_000 }
+  );
+
+  await page.fill('.Flamoji-ImportEmojisModal textarea.FormControl', payloadJson);
+
+  if (override) {
+    await page.click('.Flamoji-ImportEmojisModal label.Checkbox--switch');
+    await page.check('.Flamoji-ImportEmojisModal label.checkbox input[type="checkbox"]');
+  }
+
+  await page.click('.Flamoji-ImportEmojisModal button.Button--primary');
+  const resp = await importResponse;
+
+  // Success path closes the modal (clearCache → reload). Give it a
+  // moment, then force it closed so a failure here can't poison the
+  // next step.
+  try {
+    await page.waitForFunction(
+      () => !document.querySelector('.Flamoji-ImportEmojisModal'),
+      null,
+      { timeout: 5_000 }
+    );
+  } catch {
+    const close = await page.$('.Flamoji-ImportEmojisModal .Modal-close .Button');
+    if (close) await close.click();
+  }
+  return resp;
+}
 
 await runSpec({
   specName: 'import-export',
   outputDir: HERE,
   acceptDownloads: true,
 }, async ({ page, check, BASE }) => {
-  let toCleanupShortcodes = [];
+  let dlPath = null;
 
   try {
-    // ---- Precondition: clean slate + one seed emoji ----
+    // ---- Precondition: clean slate + one uncategorized seed emoji ----
     console.log('\n[setup] cleaning custom emojis and seeding one');
     await deleteAllCustomEmojis(page, BASE);
     await gotoAdmin(page, BASE);
@@ -61,9 +103,8 @@ await runSpec({
       shortcode: ':flamoji_ie_seed:',
       path: 'https://cdn.jsdelivr.net/npm/emoji-datasource-twitter@15.0.1/img/twitter/64/1f600.png',
     });
-    toCleanupShortcodes.push(':flamoji_ie_seed:');
 
-    // ---- 1. Export ----
+    // ---- 1. Export: grouped schema ----
     console.log('\n[export] download flamoji.json via admin button');
     await gotoAdmin(page, BASE);
 
@@ -79,7 +120,7 @@ await runSpec({
     check('export → download has filename "flamoji.json"', download.suggestedFilename() === 'flamoji.json',
       `got "${download.suggestedFilename()}"`);
 
-    const dlPath = resolve(HERE, `_export-temp-${Date.now()}.json`);
+    dlPath = resolve(HERE, `_export-temp-${Date.now()}.json`);
     await download.saveAs(dlPath);
     let exported;
     try {
@@ -90,99 +131,127 @@ await runSpec({
     }
     check('export → JSON parses', true);
 
-    // The export shape is { "0": {title, text_to_replace, path}, "1": {...}, ... }
-    const exportedRows = Object.values(exported);
+    // New contract: { "<category>": [ {title, text_to_replace,
+    // category, path}, ... ], ... }. Uncategorized rows are grouped
+    // under the translator's "Uncategorized" heading.
+    const isGrouped = exported && typeof exported === 'object' && !Array.isArray(exported);
+    check('export → grouped object (not a flat array)', isGrouped,
+      `type=${Array.isArray(exported) ? 'array' : typeof exported}`);
+
     const looksLikeRow = (r) =>
-      r && typeof r === 'object' && 'title' in r && 'text_to_replace' in r && 'path' in r;
-    const allRowsValid = exportedRows.every(looksLikeRow);
-    check('export → every row has {title, text_to_replace, path}',
-      allRowsValid,
-      `rows=${exportedRows.length} invalid=${exportedRows.filter((r) => !looksLikeRow(r)).length}`);
+      r && typeof r === 'object' && 'title' in r && 'text_to_replace' in r
+      && 'category' in r && 'path' in r;
 
-    // The forum always has at least :pianotell: from the seed; assert
-    // export is non-empty so future regressions that silently drop rows
-    // get caught.
-    check('export → non-empty (seed emoji present)', exportedRows.length >= 1,
-      `got ${exportedRows.length} rows`);
+    let totalRows = 0;
+    let invalidRows = 0;
+    let groupKeyMismatches = 0;
+    if (isGrouped) {
+      for (const [group, rows] of Object.entries(exported)) {
+        if (!Array.isArray(rows)) { invalidRows += 1; continue; }
+        for (const row of rows) {
+          totalRows += 1;
+          if (!looksLikeRow(row)) invalidRows += 1;
+          else if (group !== 'Uncategorized' && row.category !== group) groupKeyMismatches += 1;
+        }
+      }
+    }
+    check('export → every row has {title, text_to_replace, category, path}',
+      invalidRows === 0,
+      `rows=${totalRows} invalid=${invalidRows}`);
+    check('export → group key matches each row\'s category (except Uncategorized)',
+      groupKeyMismatches === 0,
+      `mismatches=${groupKeyMismatches}`);
 
-    // ---- 2. Import (new row only) ----
-    // The 2.x import endpoint rejects the entire batch if any row's
-    // text_to_replace already exists in the DB, so we import ONLY the
-    // new fixture row (not a re-import of the full export).
-    console.log('\n[import] inject one new row, import via admin button');
+    const allExportedShortcodes = isGrouped
+      ? Object.values(exported).flat().map((r) => r.text_to_replace).filter(Boolean)
+      : [];
+    check('export → non-empty (seed emoji present)',
+      allExportedShortcodes.includes(':flamoji_ie_seed:'),
+      `shortcodes=${JSON.stringify(allExportedShortcodes)}`);
 
-    const importPayload = {
-      '0': {
-        title: IMPORT_FIXTURE_TITLE,
-        text_to_replace: IMPORT_FIXTURE_SHORTCODE,
-        path: PNG_DATA_URI,
-      },
-    };
+    // ---- 2. Import legacy flat array (back-compat) ----
+    console.log('\n[import:flat] import old-format flat array via modal');
+    await gotoAdmin(page, BASE);
+    const flatPayload = [{
+      title: 'Flamoji IE Flat Fixture',
+      text_to_replace: ':flamoji_ie_flat:',
+      path: PNG_DATA_URI,
+    }];
+    const flatResp = await importViaModal(page, JSON.stringify(flatPayload));
+    check('import flat → POST succeeded', flatResp.status() === 200, `status=${flatResp.status()}`);
 
-    const importPath = resolve(HERE, `_import-temp-${Date.now()}.json`);
-    writeFileSync(importPath, JSON.stringify(importPayload), 'utf-8');
-
-    // Set up the file chooser handler BEFORE clicking — the admin code
-    // creates an <input type="file"> and immediately calls .click(),
-    // which fires `filechooser` on the page synchronously.
-    // Also accept the native confirm() dialog.
-    page.once('dialog', (d) => d.accept());
-    const filechooserPromise = page.waitForEvent('filechooser', { timeout: 10_000 });
-
-    const importBtn = page.locator('.ExtensionPage-headerTopItems button', {
-      hasText: 'Import JSON',
-    });
-    await importBtn.click();
-
-    const filechooser = await filechooserPromise;
-    toCleanupShortcodes.push(IMPORT_FIXTURE_SHORTCODE);
-
-    // The import handler chain is: FileReader → POST /flamojis/import →
-    // 200 {legacyShortcodes:[...]} → clearCache (DELETE /api/cache) →
-    // window.location.reload(). clearCache can 409 under load, breaking the
-    // chain. Rather than relying on the auto-reload, wait for the POST to
-    // complete via network interception, then force-navigate to admin
-    // ourselves. Register the response listener BEFORE setFiles triggers
-    // the chain.
-    const importResponse = page.waitForResponse(
-      resp => resp.url().includes('/flamojis/import'),
-      { timeout: 15_000 }
-    );
-    await filechooser.setFiles(importPath);
-    const resp = await importResponse;
-    check('import POST succeeded', resp.status() === 200, `status=${resp.status()}`);
-
-    await page.waitForTimeout(2000);
-    // Force a full reload to clear any stale app.store state
     await page.goto(BASE + '/admin', { waitUntil: 'networkidle' });
     await gotoAdmin(page, BASE);
     await page.waitForSelector('.customEmoji-list', { timeout: 10_000 });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1500);
 
-    const shortcodes = await listCustomEmojiShortcodes(page);
-    check('import → fixture row present in admin list',
-      shortcodes.includes(IMPORT_FIXTURE_SHORTCODE),
+    let shortcodes = await listCustomEmojiShortcodes(page);
+    check('import flat → fixture row present in admin list',
+      shortcodes.includes(':flamoji_ie_flat:'),
+      `shortcodes=${JSON.stringify(shortcodes)}`);
+    check('import flat → pre-existing seed still present (additive)',
+      shortcodes.includes(':flamoji_ie_seed:'),
       `shortcodes=${JSON.stringify(shortcodes)}`);
 
-    // Round-trip check: the export rows that pre-existed should still
-    // be present (importer is additive — does not wipe existing).
-    const preexistingShortcodes = exportedRows
-      .map((r) => r.text_to_replace)
-      .filter(Boolean);
-    const survivors = preexistingShortcodes.filter((sc) => shortcodes.includes(sc));
-    check('import → all pre-existing rows still present (additive import)',
-      survivors.length === preexistingShortcodes.length,
-      `pre=${preexistingShortcodes.length} survived=${survivors.length}`);
+    // ---- 3. Import grouped payload (new format, named category) ----
+    console.log('\n[import grouped] import grouped object via modal');
+    await gotoAdmin(page, BASE);
+    const groupedPayload = {
+      'Flamoji IE Test': [{
+        title: 'Flamoji IE Grouped Fixture',
+        text_to_replace: ':flamoji_ie_grouped:',
+        category: 'Flamoji IE Test',
+        path: PNG_DATA_URI,
+      }],
+    };
+    const groupedResp = await importViaModal(page, JSON.stringify(groupedPayload));
+    check('import grouped → POST succeeded', groupedResp.status() === 200, `status=${groupedResp.status()}`);
 
-    // Tidy local files.
-    try { unlinkSync(dlPath); } catch {}
-    try { unlinkSync(importPath); } catch {}
+    await page.goto(BASE + '/admin', { waitUntil: 'networkidle' });
+    await gotoAdmin(page, BASE);
+    await page.waitForSelector('.customEmoji-list', { timeout: 10_000 });
+    await page.waitForTimeout(1500);
+
+    shortcodes = await listCustomEmojiShortcodes(page);
+    check('import grouped → fixture row present in admin list',
+      shortcodes.includes(':flamoji_ie_grouped:'),
+      `shortcodes=${JSON.stringify(shortcodes)}`);
+    check('import grouped → all previous rows still present (additive)',
+      shortcodes.includes(':flamoji_ie_flat:') && shortcodes.includes(':flamoji_ie_seed:'),
+      `shortcodes=${JSON.stringify(shortcodes)}`);
+
+    // ---- 4. Override mode replaces the whole set ----
+    console.log('\n[import override] replace all emojis via override mode');
+    await gotoAdmin(page, BASE);
+    const overridePayload = [{
+      title: 'Flamoji IE Override Fixture',
+      text_to_replace: ':flamoji_ie_override:',
+      path: PNG_DATA_URI,
+    }];
+    const overrideResp = await importViaModal(page, JSON.stringify(overridePayload), { override: true });
+    check('import override → POST succeeded', overrideResp.status() === 200, `status=${overrideResp.status()}`);
+
+    await page.goto(BASE + '/admin', { waitUntil: 'networkidle' });
+    await gotoAdmin(page, BASE);
+    await page.waitForSelector('.customEmoji-list', { timeout: 10_000 });
+    await page.waitForTimeout(1500);
+
+    shortcodes = await listCustomEmojiShortcodes(page);
+    check('import override → pre-existing rows are gone',
+      !shortcodes.includes(':flamoji_ie_seed:')
+      && !shortcodes.includes(':flamoji_ie_flat:')
+      && !shortcodes.includes(':flamoji_ie_grouped:'),
+      `shortcodes=${JSON.stringify(shortcodes)}`);
+    check('import override → only the override fixture remains',
+      shortcodes.length === 1 && shortcodes.includes(':flamoji_ie_override:'),
+      `shortcodes=${JSON.stringify(shortcodes)}`);
+
   } finally {
-    console.log('\n[cleanup] deleting fixture row via admin Delete button');
-    for (const sc of toCleanupShortcodes) {
-      await deleteCustomEmojiByShortcode(page, sc).catch((e) =>
-        console.log(`  (cleanup of ${sc} failed: ${e.message.slice(0, 80)})`)
-      );
-    }
+    console.log('\n[cleanup] removing all custom emojis via admin Delete buttons');
+    await deleteAllCustomEmojis(page, BASE).catch((e) =>
+      console.log(`  (cleanup failed: ${e.message.slice(0, 80)})`)
+    );
+    // Tidy the exported download even if an earlier scenario threw.
+    if (dlPath) { try { unlinkSync(dlPath); } catch {} }
   }
 });
