@@ -1,3 +1,10 @@
+### 1.6.0 — 2026-09-06
+
+- **Organize custom emojis in the admin panel.** The admin list now groups your custom emojis by category, with uncategorized emojis collected under a translatable "Uncategorized" heading. Groups render alphabetically and the "Add Emoji" button stays pinned at the top for quick access. Thanks to @huoxin233.
+- **Rename a category inline.** Click the pencil next to a group title to rename it — every emoji in the group moves with it, even ones further down the list. Contributed by @huoxin233.
+- **Organized JSON exports.** "Export JSON" groups emojis by category, and each category header now has its own export icon so you can export a single category. Exports rely on native browser APIs (the deprecated file-saver dependency is gone). Contributed by @huoxin233.
+- **A friendlier import dialog.** Importing opens a proper modal where you choose to add the imported emojis to your existing set, or replace your entire set with a confirmation first. Older exported files still import cleanly. Contributed by @huoxin233.
+
 ### 1.5.0 — 2026-07-02
 
 - **Load emoji-mart from a CDN (optional).** A new "Load Emoji-Mart via CDN" admin toggle serves the emoji-mart library and emoji data from a third-party CDN (jsDelivr by default) instead of from your own server. It ships with pinned URLs and matching Subresource Integrity (SRI) hashes, so integrity checking is on out of the box and both the script and the dataset are verified. If the CDN is unreachable — or an SRI hash doesn't match — the picker automatically falls back to the copy bundled with the extension, so it never breaks. Off by default; loading from an external origin requires your Content-Security-Policy (if any) to allow it. Thanks to @huoxin233 for the original contribution.
