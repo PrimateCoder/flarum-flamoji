@@ -37,6 +37,7 @@ return [
         ->get('/pianotell/emojis', 'emojis.list', Controllers\ListEmojisController::class)
         ->post('/pianotell/emojis', 'emojis.create', Controllers\CreateEmojiController::class)
         ->post('/pianotell/import-emojis', 'emojis.import', Controllers\ImportEmojiController::class)
+        ->post('/pianotell/rename-category', 'emojis.rename-category', Controllers\RenameCategoryController::class)
         ->patch('/pianotell/emojis/{id}', 'emojis.update', Controllers\UpdateEmojiController::class)
         ->delete('/pianotell/emojis/{id}', 'emojis.delete', Controllers\DeleteEmojiController::class),
 
