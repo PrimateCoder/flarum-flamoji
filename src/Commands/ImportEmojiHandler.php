@@ -43,7 +43,7 @@ class ImportEmojiHandler
         $legacyShortcodes = [];
 
         // Pre-load existing triggers for duplicate detection.
-        $existingTriggers = Emoji::pluck('text_to_replace')->filter()->all();
+        $existingTriggers = $command->mode === 'override' ? [] : Emoji::pluck('text_to_replace')->filter()->all();
 
         foreach ($command->data as $i => $emojiData) {
             try {
@@ -78,7 +78,11 @@ class ImportEmojiHandler
             throw new ValidationException($errors);
         }
 
-        $this->db->transaction(function () use ($normalized) {
+        $this->db->transaction(function () use ($normalized, $command) {
+            if ($command->mode === 'override') {
+                Emoji::query()->delete();
+            }
+
             foreach ($normalized as $row) {
                 $emoji = Emoji::build(
                     $row['title'],

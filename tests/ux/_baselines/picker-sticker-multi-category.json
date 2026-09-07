@@ -1,0 +1,13 @@
+{
+  "visible": true,
+  "hasSearchInput": true,
+  "hasPreview": true,
+  "hasSkinToneButton": false,
+  "navLabels": [
+    "Memes",
+    "Reactions"
+  ],
+  "navCount": 2,
+  "tileSize": 78,
+  "firstTileHasSpriteBackground": false
+}
