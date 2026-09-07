@@ -91,7 +91,17 @@ async function setSwitch(page, label, desired) {
   const el = handle.asElement();
   if (!el) throw new Error(`Switch not found: "${label}"`);
   const current = await el.evaluate((l) => l.querySelector("input")?.checked);
-  if (current !== desired) await el.click();
+  if (current !== desired) {
+    // The admin SPA bursts through Mithril redraws after page
+    // transitions; a switch can sit mid-redraw and never settle for
+    // Playwright's stability check. First attempt waits normally,
+    // second forces the click — toggling a switch is idempotent-safe.
+    try {
+      await el.click({ timeout: 10_000 });
+    } catch (e) {
+      await el.click({ timeout: 10_000, force: true });
+    }
+  }
   await handle.dispose();
 }
 
@@ -169,17 +179,48 @@ export async function applySettings(page, overrides, baseUrl) {
   for (const [key, label] of Object.entries(SWITCH_LABELS)) {
     if (key in overrides) await setSwitch(page, label, !!overrides[key]);
   }
+  // Let Mithril's async redraw flush after toggling switches before
+  // dependent inputs are touched: the recentsCountGroup input is
+  // shown/hidden by the show_recents switch, and filling it while the
+  // redraw is still in flight races the toggle (seen flaking on 1.x).
+  if ("show_recents" in overrides) {
+    const want = !!overrides.show_recents;
+    await page
+      .waitForFunction(
+        (on) => {
+          const input = document.querySelector(
+            '.recentsCountGroup input[type="number"]'
+          );
+          if (on) return input && input.offsetParent !== null;
+          return !input || input.offsetParent === null;
+        },
+        want,
+        { timeout: 10_000 }
+      )
+      .catch(() => {});
+  }
   if ("picker_set" in overrides)
     await setSelectByValue(page, overrides.picker_set);
   if ("frequent_rows" in overrides) {
     // The Frequent emoji rows input only renders when show_recents is
-    // ON. Caller's responsibility to ensure that — we don't toggle it
-    // implicitly because that would mask a buggy admin UI.
-    await setNumberInput(
-      page,
-      '.recentsCountGroup input[type="number"]',
-      overrides.frequent_rows
-    );
+    // ON. If the request turns recents OFF, the input is legitimately
+    // gone from the admin DOM (1.x removes/hides it) — filling would
+    // hang. Skip it in that case; there is nothing to fill.
+    const recentsInput = await page
+      .waitForSelector('.recentsCountGroup input[type="number"]', { timeout: 2_000 })
+      .catch(() => null);
+    if (recentsInput) {
+      await setNumberInput(
+        page,
+        '.recentsCountGroup input[type="number"]',
+        overrides.frequent_rows
+      );
+    } else if (overrides.show_recents !== false) {
+      throw new Error(
+        "frequent_rows requested but .recentsCountGroup input is not rendered " +
+        "(show_recents is on in this overrides map?)"
+      );
+    }
   }
   if ("specify_categories" in overrides)
     await setCategories(page, overrides.specify_categories);
@@ -375,10 +416,16 @@ export async function addCustomEmoji(
 
   // Save click can be intercepted by a lingering overlay while the
   // page is under load — retry with a settle instead of aborting (the
-  // modal still holds the filled data).
+  // modal still holds the filled data). Last attempt uses force:true:
+  // the fields are verified just above, so if the button sits mid-
+  // redraw and never settles for Playwright's stability check, the
+  // click must still land.
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      await page.click(".EditEmojiModal-save", { timeout: 10_000 });
+      await page.click(".EditEmojiModal-save", {
+        timeout: 10_000,
+        force: attempt === 3,
+      });
       break;
     } catch (e) {
       if (attempt === 3) throw e;
@@ -467,7 +514,10 @@ async function deleteCustomEmojiByShortcodeOnce(page, shortcode, attempt) {
   // EditEmojiModal.delete() uses native window.confirm — auto-accept.
   // Register the handler before the click so we don't miss it.
   page.once("dialog", (d) => d.accept());
-  await page.click(".EditEmojiModal-delete");
+  await page.click(".EditEmojiModal-delete", {
+    timeout: 10_000,
+    force: attempt === 2,
+  });
 
   try {
     await page.waitForFunction(
