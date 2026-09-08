@@ -18,10 +18,19 @@ class ImportEmoji
     public $data;
 
     /**
-     * @param array $data The attributes of the new emoji.
+     * The import mode ('append' or 'override').
+     *
+     * @var string
      */
-    public function __construct(array $data)
+    public $mode;
+
+    /**
+     * @param array $data The attributes of the new emoji.
+     * @param string $mode The import mode ('append' or 'override').
+     */
+    public function __construct(array $data, string $mode = 'append')
     {
         $this->data = $data;
+        $this->mode = $mode;
     }
 }

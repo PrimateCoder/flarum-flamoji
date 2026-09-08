@@ -16,7 +16,21 @@ async function clickPickerButton(page) {
   await page.waitForSelector('button.Button-flamoji, button[title*="moji" i]', {
     timeout: 10_000,
   });
-  await page.click('button.Button-flamoji, button[title*="moji" i]');
+  // The toolbar re-renders under Mithril; right after a picker open/
+  // close cycle the button can sit mid-redraw and never settle for
+  // Playwright's stability check within a single attempt. Retry with
+  // a settle instead of aborting the phase.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await page.click('button.Button-flamoji, button[title*="moji" i]', {
+        timeout: 8_000,
+      });
+      return;
+    } catch (e) {
+      if (attempt === 3) throw e;
+      await page.waitForTimeout(400);
+    }
+  }
 }
 
 async function snapshotLoader(page) {
@@ -92,7 +106,7 @@ await runSpec({
     () => {
       const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
       return p?.shadowRoot?.querySelector('input[type="search"]') != null;
-    },
+    }, null,
     { timeout: 15_000 }
   );
   const afterMount = await snapshotLoader(page);
@@ -163,7 +177,7 @@ await runSpec({
     () => {
       const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
       return p?.shadowRoot?.querySelector('input[type="search"]') != null;
-    },
+    }, null,
     { timeout: 15_000 }
   );
   const afterRetry = await snapshotLoader(page2);
@@ -298,7 +312,7 @@ await runSpec({
     () => {
       const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
       return p?.shadowRoot?.querySelector('input[type="search"]') != null;
-    },
+    }, null,
     { timeout: 15_000 }
   );
   // Close the picker popup (Escape) then re-open it.

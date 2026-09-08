@@ -8,8 +8,9 @@
 
 namespace PianoTell\Flamoji\Api\Controllers;
 
+use Flarum\Foundation\ValidationException;
 use Flarum\Http\RequestUtil;
-use PianoTell\Flamoji\Commands\ImportEmoji;
+use PianoTell\Flamoji\Commands\RenameCategory;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\Arr;
 use Laminas\Diactoros\Response\JsonResponse;
@@ -17,7 +18,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
-class ImportEmojiController implements RequestHandlerInterface
+class RenameCategoryController implements RequestHandlerInterface
 {
     /**
      * @var Dispatcher
@@ -34,16 +35,20 @@ class ImportEmojiController implements RequestHandlerInterface
         RequestUtil::getActor($request)->assertAdmin();
 
         $body = $request->getParsedBody();
-        $data = Arr::get($body, 'data', []);
-        $mode = Arr::get($body, 'mode', 'append');
+        $from = Arr::get($body, 'from');
+        $to = Arr::get($body, 'to');
 
-        // The handler returns the non-canonical ("legacy") shortcodes that
-        // were imported as-is, so the admin UI can surface a non-blocking
-        // notice. Older clients ignore the body.
-        $legacyShortcodes = $this->bus->dispatch(
-            new ImportEmoji($data, $mode)
+        foreach (['from', 'to'] as $key) {
+            $value = $$key;
+            if ($value !== null && ! is_string($value)) {
+                throw new ValidationException([$key => 'Must be a string or null.']);
+            }
+        }
+
+        $updated = $this->bus->dispatch(
+            new RenameCategory($from, $to)
         );
 
-        return new JsonResponse(['legacyShortcodes' => $legacyShortcodes], 200);
+        return new JsonResponse(['updated' => $updated], 200);
     }
 }

@@ -29,14 +29,14 @@ async function openPicker(page) {
     () => {
       const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
       return p?.shadowRoot?.querySelector('input[type="search"]') != null;
-    },
+    }, null,
     { timeout: 15_000 }
   );
   await page.waitForFunction(
     () => {
       const p = document.querySelector('em-emoji-picker.flamoji-picker-popup');
       return p?.shadowRoot?.querySelectorAll('.category button').length > 5;
-    },
+    }, null,
     { timeout: 10_000 }
   );
   await page.waitForTimeout(800);

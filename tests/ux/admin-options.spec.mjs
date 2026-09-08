@@ -66,7 +66,7 @@ async function openPicker(page) {
         sr.querySelector("nav button[aria-label]") ||
         sr.querySelector(".category button")
       );
-    },
+    }, null,
     { timeout: 15_000 }
   );
   await page.waitForTimeout(300);
