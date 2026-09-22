@@ -1,3 +1,7 @@
+### 2.6.1 — 2026-09-06
+
+- **Fixed a transient admin dashboard error** that could appear when installing or uninstalling extensions. A page error mentioning "this.extension" no longer breaks the dashboard render until the next reload.
+
 ### 2.6.0 — 2026-09-06
 
 - **Organize custom emojis in the admin panel.** The admin list now groups your custom emojis by category, with uncategorized emojis collected under a translatable "Uncategorized" heading. Groups render alphabetically and the "Add Emoji" button stays pinned at the top for quick access. Thanks to @huoxin233.
