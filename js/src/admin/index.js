@@ -25,13 +25,16 @@ app.initializers.add('pianotell-flamoji', (app) => {
   app.customEmojiListState = new CustomEmojiListState();
 
   extend(ExtensionPage.prototype, 'oninit', function () {
-    if (this.extension.id != 'pianotell-flamoji') return;
+    // this.extension can be undefined while the extension list is being
+    // refreshed (install/uninstall transitions) — core's oninit resolves
+    // it from app.extensions and the lookup can miss.
+    if (!this.extension || this.extension.id != 'pianotell-flamoji') return;
 
     this.specifiedCategories = JSON.parse(app.data.settings['pianotell-flamoji.specify_categories'] || '[]');
   });
 
   extend(ExtensionPage.prototype, 'sections', function (items) {
-    if (this.extension.id != 'pianotell-flamoji') return;
+    if (!this.extension || this.extension.id != 'pianotell-flamoji') return;
 
     items.has('permissions') ? items.remove('permissions') : '';
 
