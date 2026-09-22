@@ -1,3 +1,7 @@
+### 2.6.1 — 2026-09-06
+
+- **Fixed a transient admin dashboard error** that could appear when installing or uninstalling extensions. A page error mentioning "this.extension" no longer breaks the dashboard render until the next reload.
+
 ### 2.6.0 — 2026-09-06
 
 - **Organize custom emojis in the admin panel.** The admin list now groups your custom emojis by category, with uncategorized emojis collected under a translatable "Uncategorized" heading. Groups render alphabetically and the "Add Emoji" button stays pinned at the top for quick access. Thanks to @huoxin233.
@@ -52,6 +56,10 @@
 
 - **Ported to Flarum 2.x.** Requires `flarum/core: ^2.0.0-beta` and `php: ^8.3`.
 - Added picker variant and admin console baseline tests.
+
+### 1.6.1 — 2026-09-06
+
+- **Fixed a transient admin dashboard error** that could appear when installing or uninstalling extensions. A page error mentioning "this.extension" no longer breaks the dashboard render until the next reload.
 
 ### 1.6.0 — 2026-09-06
 
