@@ -102,6 +102,15 @@ app.initializers.add('pianotell-flamoji', (app) => {
             </div>
             <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.show_search_text')}</div>
           </div>
+          {!!this.setting(['pianotell-flamoji.show_search'])() && this.setting(['pianotell-flamoji.show_search'])() !== '0' && (
+            <div className="Flamoji--generalUISetting">
+              <div className="Form-group">
+                <label>{app.translator.trans('pianotell-flamoji.admin.settings.localized_search_url_label')}</label>
+                <input className="FormControl" type="text" bidi={this.setting('pianotell-flamoji.localized_search_url')} />
+              </div>
+              <div className="helpText">{app.translator.trans('pianotell-flamoji.admin.settings.localized_search_url_text')}</div>
+            </div>
+          )}
           <div className="Flamoji--generalUISetting">
             <div className="Form-group">
               <Switch

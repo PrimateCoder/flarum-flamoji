@@ -56,6 +56,7 @@ return [
         ->default('pianotell-flamoji.cdn_js_sri', 'sha384-lONtvEeik96slH87Kr9CY74xGakohuxbgkyhwbPDOM9ZzVfW7Twaltwp+WrerZ9k')
         ->default('pianotell-flamoji.cdn_data_url', 'https://cdn.jsdelivr.net/npm/@emoji-mart/data@1.2.1/sets/15/twitter.json')
         ->default('pianotell-flamoji.cdn_data_sri', 'sha384-nTfzV//8XRZRt4ms47kKHhRH4UmfMKauaSKfgROlVYFtjpLp1A5uvbfltNZBdDPV')
+        ->default('pianotell-flamoji.localized_search_url', 'https://cdn.jsdelivr.net/npm/emojibase-data@15.3.2/{locale}/compact.json')
         ->serializeToForum('flamoji.auto_hide', 'pianotell-flamoji.auto_hide', 'boolVal')
         ->serializeToForum('flamoji.show_preview', 'pianotell-flamoji.show_preview', 'boolVal')
         ->serializeToForum('flamoji.show_search', 'pianotell-flamoji.show_search', 'boolVal')
@@ -70,7 +71,8 @@ return [
         ->serializeToForum('flamoji.cdn_js_url', 'pianotell-flamoji.cdn_js_url')
         ->serializeToForum('flamoji.cdn_js_sri', 'pianotell-flamoji.cdn_js_sri')
         ->serializeToForum('flamoji.cdn_data_url', 'pianotell-flamoji.cdn_data_url')
-        ->serializeToForum('flamoji.cdn_data_sri', 'pianotell-flamoji.cdn_data_sri'),
+        ->serializeToForum('flamoji.cdn_data_sri', 'pianotell-flamoji.cdn_data_sri')
+        ->serializeToForum('flamoji.localized_search_url', 'pianotell-flamoji.localized_search_url'),
 
     // Surface whether the core flarum/emoji extension is currently enabled,
     // so the picker can match its rendering style (Twemoji vs OS native)
