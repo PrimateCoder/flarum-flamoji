@@ -22,6 +22,8 @@ pianotell-flamoji:
       show_category_buttons_text: Show the row of category icons at the top of the picker. Useful to disable when only one or two categories are enabled.
       show_search_label: Show search input
       show_search_text: Show the search box at the top of the picker.
+      localized_search_url_label: Localized Search Data URL
+      localized_search_url_text: URL template (using {locale}) for localized emoji search keywords on non-English forums. Leave empty to use English search only. Note that loading from an external origin requires your Content-Security-Policy (if any) to allow it.
       use_cdn_label: Load Emoji-Mart via CDN
       use_cdn_text: Load the emoji-mart library and emoji data from a third-party CDN (e.g. jsDelivr) instead of serving them from your own server. Off by default. If the CDN fails to load — or a Subresource Integrity (SRI) hash doesn't match — the picker automatically falls back to the copy bundled with this extension. Note that loading from an external origin requires your Content-Security-Policy (if any) to allow it.
       cdn_js_url_label: CDN JavaScript URL
