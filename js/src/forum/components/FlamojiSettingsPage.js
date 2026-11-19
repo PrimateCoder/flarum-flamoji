@@ -299,11 +299,7 @@ export default class FlamojiSettingsPage extends UserPage {
     this._sortable = this._Sortable.create(listEl, {
       animation: 150,
       easing: 'cubic-bezier(0.2, 0, 0, 1)',
-      filter: 'button, a, input, label, select, .Checkbox',
-      preventOnFilter: false,
-      delay: 50,
-      delayOnTouchOnly: true,
-      touchStartThreshold: 5,
+      handle: '.FlamojiSettings-dragHandle',
       disabled: !!this.savingPreferences,
       ghostClass: 'FlamojiSettings-categoryRow--ghost',
       chosenClass: 'FlamojiSettings-categoryRow--chosen',

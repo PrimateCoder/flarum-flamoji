@@ -95,7 +95,7 @@ pianotell-flamoji:
       nav_label: Emoji Picker
       title: Emoji Picker Settings
       emoji_categories_heading: Emoji Categories & Packs
-      emoji_categories_help: Enable, disable, and arrange the categories shown in your emoji picker. Drag rows or use the arrow buttons to reorder them.
+      emoji_categories_help: Enable, disable, and arrange the categories shown in your emoji picker. Drag the handle or use the arrow buttons to reorder them.
       preview_heading: Live Picker Preview
       preview_help: Test your customized emoji picker layout below.
       preview_selected: "Selected: {shortcode}"
