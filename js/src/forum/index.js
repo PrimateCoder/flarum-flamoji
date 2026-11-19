@@ -8,6 +8,7 @@
 import { extend } from 'flarum/common/extend';
 
 import app from 'flarum/common/app';
+import LinkButton from 'flarum/common/components/LinkButton';
 import FlamojiPickerButton from './components/FlamojiPickerButton';
 
 export { default as extend } from './extend';
@@ -45,6 +46,21 @@ app.initializers.add(
 
       // Drop the stock flarum/emoji toolbar button if present; we replace it.
       if (items.has('emoji')) items.remove('emoji');
+    });
+
+    // Add dedicated Emoji Picker settings link to the user profile sidebar.
+    extend('flarum/forum/components/UserPage', 'navItems', function (items) {
+      if (!app.session.user || !this.user || app.session.user.id() !== this.user.id()) {
+        return;
+      }
+
+      items.add(
+        'flamoji',
+        <LinkButton href={app.route('settings.flamoji')} icon="far fa-smile-wink">
+          {app.translator.trans(t + 'settings.nav_label')}
+        </LinkButton>,
+        -105
+      );
     });
   },
   -150 // initialize before flarum/emoji
