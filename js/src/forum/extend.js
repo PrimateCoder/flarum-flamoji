@@ -1,6 +1,11 @@
-import Extend from 'flarum/common/extenders';
+/*
+ * This file is part of Flamoji.
+ *
+ * For detailed copyright and license information, please view the
+ * LICENSE file that was distributed with this source code.
+ */
 
-export default [
-  // Forum-side extenders (none needed currently — picker is initialized
-  // via app.initializers in index.js)
-];
+import Extend from 'flarum/common/extenders';
+import FlamojiSettingsPage from './components/FlamojiSettingsPage';
+
+export default [new Extend.Routes().add('settings.flamoji', '/settings/flamoji', FlamojiSettingsPage)];

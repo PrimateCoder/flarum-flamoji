@@ -11,6 +11,14 @@ import PickerLoader from './components/PickerLoader';
 import positionPopup from './utils/positionPopup';
 import { injectEmojiMartRgbVars, injectShadowStyles } from './utils/pickerTheme';
 import buildPickerConfig from './utils/buildPickerConfig';
+import {
+  STICKER_SKELETON,
+  ensureWebpackAssetConfig,
+  extractEmojiArray,
+  getPreferencesSignature,
+  loadEmojiMartModule,
+  loadUnicodeDataset,
+} from './utils/customEmojiCategories';
 
 const t = 'pianotell-flamoji.forum.';
 
@@ -18,11 +26,6 @@ const t = 'pianotell-flamoji.forum.';
 // skip it entirely — avoids a flicker where the placeholder shows for one
 // frame and is immediately replaced by the real picker.
 const LOADER_DELAY_MS = 120;
-
-// One-time global patch to webpack's chunk-URL builder, appending the
-// forum.js revision hash as a cache-buster so lazy chunks bust the browser
-// cache after upgrades. Shared across every controller instance.
-let webpackVersioned = false;
 
 /**
  * Owns the emoji-mart picker lifecycle for a single Flarum composer: lazy
@@ -52,6 +55,7 @@ export default class PickerController {
 
     this.picker = null;
     this._disposed = false;
+    this._prefsSignature = null;
 
     this.isLoading = false;
     this.isLoaded = false;
@@ -70,7 +74,7 @@ export default class PickerController {
 
     // Point __webpack_public_path__ at our extension's published assets so
     // webpack knows where to fetch lazy chunks (emoji-mart.js, etc).
-    this._setWebpackPublicPath();
+    ensureWebpackAssetConfig();
   }
 
   /** The toolbar button element (positioning anchor + focus target). */
@@ -82,11 +86,6 @@ export default class PickerController {
   _isConnected() {
     const btn = this._button();
     return !!(btn && btn.isConnected);
-  }
-
-  _setWebpackPublicPath() {
-    const baseUrl = (app.forum.attribute('baseUrl') || '').replace(/\/+$/, '');
-    __webpack_public_path__ = baseUrl + '/assets/extensions/pianotell-flamoji/dist/';
   }
 
   // ---------------------------------------------------------------------
@@ -216,12 +215,20 @@ export default class PickerController {
 
   /**
    * Toggle the picker. On the first open, lazy-loads emoji-mart + its data and
-   * builds the picker. On subsequent opens, just toggles visibility.
+   * builds the picker. On subsequent opens, just toggles visibility (unless
+   * category preferences changed since the picker was built, in which case it
+   * rebuilds cleanly).
    */
   toggle() {
     if (this.isLoading) return;
 
     if (this.isLoaded) {
+      if (getPreferencesSignature() !== this._prefsSignature) {
+        this.dispose();
+        this._disposed = false;
+        this.toggle();
+        return;
+      }
       this.isVisible = !this.isVisible;
       this.picker.style.display = this.isVisible ? '' : 'none';
       if (this.isVisible) this._reposition();
@@ -234,125 +241,26 @@ export default class PickerController {
 
     // Re-assert the public path and patch chunk URLs to bust cache after
     // upgrades, then kick off the load.
-    this._setWebpackPublicPath();
-    this._patchWebpackVersion();
+    ensureWebpackAssetConfig();
     this._loadAndBuild();
   }
 
-  _patchWebpackVersion() {
-    if (webpackVersioned) return;
-    const scripts = document.querySelectorAll('script[src*="forum.js"]');
-    for (const s of scripts) {
-      const match = s.src.match(/[?&]v=([a-f0-9]+)/);
-      if (match) {
-        const ver = match[1];
-        const origU = __webpack_require__.u;
-        __webpack_require__.u = (id) => origU(id) + '?v=' + ver;
-        break;
-      }
-    }
-    webpackVersioned = true;
-  }
-
   _loadAndBuild() {
-    const useCdn = app.forum.attribute('flamoji.use_cdn');
     const stickerMode = !!app.forum.attribute('flamoji.sticker_mode');
-
-    // --- emoji-mart library -----------------------------------------
-    // Local webpack chunk (the default) or, when CDN mode is on, an injected
-    // <script> exposing window.EmojiMart. On any CDN failure (network, or an
-    // SRI integrity mismatch) fall back to the bundled copy rather than
-    // leaving the picker broken.
-    const importLocalJs = () => import(/* webpackChunkName: "emoji-mart" */ 'emoji-mart');
-    let loadJs;
-    const cdnJsUrl = app.forum.attribute('flamoji.cdn_js_url');
-    if (useCdn && cdnJsUrl) {
-      const cdnJsSri = app.forum.attribute('flamoji.cdn_js_sri');
-      loadJs = new Promise((resolve, reject) => {
-        if (window.EmojiMart) return resolve(window.EmojiMart);
-        const script = document.createElement('script');
-        script.src = cdnJsUrl;
-        if (cdnJsSri) {
-          // SRI requires CORS; jsdelivr serves the proper headers. A hash
-          // mismatch makes the browser fire onerror (blocked), so we then
-          // fall back to the local bundle below.
-          script.integrity = cdnJsSri;
-          script.crossOrigin = 'anonymous';
-        }
-        script.onload = () =>
-          window.EmojiMart ? resolve(window.EmojiMart) : reject(new Error('emoji-mart CDN script loaded but window.EmojiMart is undefined'));
-        script.onerror = reject;
-        document.head.appendChild(script);
-      }).catch((err) => {
-        console.warn('[pianotell-flamoji] emoji-mart CDN load failed; falling back to local bundle:', err);
-        return importLocalJs();
-      });
-    } else {
-      loadJs = importLocalJs();
-    }
-
+    const loadJs = loadEmojiMartModule();
     const loadApi = app.request({
       method: 'GET',
       url: app.forum.attribute('apiUrl') + '/flamojis/all',
     });
 
-    // --- emoji dataset ----------------------------------------------
-    const importLocalData = () => import(/* webpackChunkName: "emoji-mart-data" */ '@emoji-mart/data/sets/15/twitter.json');
-
-    // Local chunk (default) or an integrity-checked CDN fetch, falling back to
-    // the bundled copy on any failure (network or SRI mismatch).
-    const loadUnicodeData = () => {
-      const cdnDataUrl = app.forum.attribute('flamoji.cdn_data_url');
-      if (useCdn && cdnDataUrl) {
-        const cdnDataSri = app.forum.attribute('flamoji.cdn_data_sri');
-        // fetch() enforces SRI when `integrity` is set: a mismatch rejects the
-        // promise, so tampered/wrong data can't reach the picker.
-        const opts = cdnDataSri ? { integrity: cdnDataSri } : {};
-        return fetch(cdnDataUrl, opts)
-          .then((res) => {
-            if (!res.ok) throw new Error('emoji-mart data CDN responded ' + res.status);
-            return res.json();
-          })
-          .catch((err) => {
-            console.warn('[pianotell-flamoji] emoji-mart data CDN load failed; falling back to local bundle:', err);
-            return importLocalData();
-          });
-      }
-      return importLocalData();
-    };
-
     // In sticker mode we can skip the (heavy) unicode dataset entirely and feed
-    // the picker a tiny skeleton — but only when there is actually at least one
-    // custom emoji (effective sticker mode). That decision needs the custom-
-    // emoji count from the API, so gate the data load on it ONLY when sticker
-    // mode is enabled. When it's off (the common case), start the dataset load
-    // immediately, in parallel with the API — otherwise we needlessly serialize
-    // the 460KB dataset behind the API round-trip.
-    //
-    // emoji-mart's preview renders one of a few built-in default emoji
-    // depending on state: "point_up" (bottom idle), "point_down" (top idle),
-    // and "cry" (no search results). Seed all three as native glyphs so the
-    // preview is never blank in sticker mode, without pulling in the full
-    // dataset. They render natively (see the forced `set: 'native'` in
-    // buildPickerConfig); the sprite path would need the real dataset's sheet.
-    const STICKER_SKELETON = {
-      categories: [],
-      emojis: {
-        point_up: { id: 'point_up', name: 'Index Pointing Up', skins: [{ native: '☝️' }] },
-        point_down: { id: 'point_down', name: 'Backhand Index Pointing Down', skins: [{ native: '👇' }] },
-        cry: { id: 'cry', name: 'Crying Face', skins: [{ native: '😢' }] },
-      },
-      aliases: {},
-      sheet: { cols: 1, rows: 1 },
-    };
-    // The /all endpoint returns raw model objects keyed numerically, so the
-    // custom-emoji count is the number of numeric keys in the response.
+    // the picker a tiny skeleton — whenever there is at least one custom emoji
+    // on the forum (effective sticker mode).
     const loadData = stickerMode
       ? loadApi.then((response) => {
-          const customEmojisCount = Object.keys(response).filter((k) => !isNaN(k)).length;
-          return customEmojisCount > 0 ? STICKER_SKELETON : loadUnicodeData();
+          return extractEmojiArray(response).length > 0 ? STICKER_SKELETON : loadUnicodeDataset();
         })
-      : loadUnicodeData();
+      : loadUnicodeDataset();
 
     return Promise.all([loadJs, loadData, loadApi])
       .then(([emojiMartModule, dataModule, response]) => {
@@ -365,11 +273,7 @@ export default class PickerController {
           this.unmountLoader();
           return;
         }
-        // The /all endpoint returns raw model objects keyed numerically (not a
-        // JSON:API envelope). Extract them into an array.
-        const emojis = Object.keys(response)
-          .filter((k) => !isNaN(k))
-          .map((k) => response[k]);
+        const emojis = extractEmojiArray(response);
         this.buildPicker(emojiMartModule, dataModule, emojis);
       })
       .catch((err) => {
@@ -481,6 +385,7 @@ export default class PickerController {
     };
     document.addEventListener('keydown', this._keydown, true);
 
+    this._prefsSignature = getPreferencesSignature();
     this.isLoaded = true;
     this.isLoading = false;
     this.isVisible = true;
@@ -527,6 +432,7 @@ export default class PickerController {
       }
     }
     this.picker = null;
+    this._prefsSignature = null;
     this.isLoaded = false;
     this.isVisible = false;
   }
