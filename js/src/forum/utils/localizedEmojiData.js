@@ -7,18 +7,15 @@
 
 import app from 'flarum/common/app';
 
-const EMOJIBASE_VERSION = '15.3.2';
 const FETCH_TIMEOUT_MS = 4000;
-export const DEFAULT_LOCALIZED_SEARCH_URL = `https://cdn.jsdelivr.net/npm/emojibase-data@${EMOJIBASE_VERSION}/{locale}/compact.json`;
+export const DEFAULT_LOCALIZED_SEARCH_URL = 'https://cdn.jsdelivr.net/npm/emojibase-data@15.3.2/{locale}/compact.json';
 
-// Locales published by emojibase-data that have compact.json CLDR annotations.
-// Checking locally avoids doomed 404 requests for unsupported Flarum locales.
-const SUPPORTED_LOCALES = new Set([
+// Non-English locales published by emojibase-data@15.3.2 (used only for the
+// pinned default URL to avoid guaranteed 404 requests on unsupported locales).
+const DEFAULT_SUPPORTED_LOCALES = new Set([
   'bn',
   'da',
   'de',
-  'en',
-  'en-gb',
   'es',
   'es-mx',
   'et',
@@ -47,11 +44,9 @@ const SUPPORTED_LOCALES = new Set([
 const LOCALE_ALIASES = {
   no: 'nb',
   nn: 'nb',
-  zh: 'zh',
   'zh-cn': 'zh',
   'zh-hans': 'zh',
   'zh-sg': 'zh',
-  'zh-hant': 'zh-hant',
   'zh-hk': 'zh-hant',
   'zh-mo': 'zh-hant',
   'zh-tw': 'zh-hant',
@@ -71,9 +66,11 @@ export function getActiveLocale() {
 
 /**
  * Map Flarum's active locale code to an emojibase-data locale, or return null
- * when English (already built into @emoji-mart/data) or unsupported.
+ * when English (already built into @emoji-mart/data) or unsupported by the
+ * pinned default emojibase-data@15.3.2 release. Custom URL templates bypass
+ * the fixed allowlist so admins can point at newer releases or custom files.
  */
-export function resolveEmojibaseLocale(rawLocale) {
+export function resolveEmojibaseLocale(rawLocale, urlTemplate = DEFAULT_LOCALIZED_SEARCH_URL) {
   const normalized = String(rawLocale || '')
     .trim()
     .toLowerCase()
@@ -83,16 +80,18 @@ export function resolveEmojibaseLocale(rawLocale) {
     return null;
   }
 
-  if (LOCALE_ALIASES[normalized]) {
-    return LOCALE_ALIASES[normalized];
+  const mapped = LOCALE_ALIASES[normalized] || normalized;
+
+  if (urlTemplate !== DEFAULT_LOCALIZED_SEARCH_URL) {
+    return mapped;
   }
 
-  if (SUPPORTED_LOCALES.has(normalized)) {
-    return normalized;
+  if (DEFAULT_SUPPORTED_LOCALES.has(mapped)) {
+    return mapped;
   }
 
-  const primary = normalized.split('-')[0];
-  if (primary && primary !== 'en' && SUPPORTED_LOCALES.has(primary)) {
+  const primary = mapped.split('-')[0];
+  if (primary && primary !== 'en' && DEFAULT_SUPPORTED_LOCALES.has(primary)) {
     return primary;
   }
 

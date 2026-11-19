@@ -337,7 +337,7 @@ export default class PickerController {
     // the 460KB dataset behind the API round-trip.
     const showSearch = !!app.forum.attribute('flamoji.show_search');
     const urlTemplate = getLocalizedSearchUrlTemplate();
-    const searchLocale = showSearch && urlTemplate ? resolveEmojibaseLocale(getActiveLocale()) : null;
+    const searchLocale = showSearch && urlTemplate ? resolveEmojibaseLocale(getActiveLocale(), urlTemplate) : null;
     const preloadedAnnotations = searchLocale && !stickerMode ? loadLocalizedAnnotations(searchLocale, urlTemplate) : null;
 
     const loadLocalizedUnicodeData = () => {
