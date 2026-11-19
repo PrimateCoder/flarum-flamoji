@@ -165,11 +165,6 @@ html.flamoji--sticker span.flamoji img {
   border: 1px solid transparent;
   border-radius: @border-radius;
   transition: opacity 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
-  cursor: grab;
-
-  &:active {
-    cursor: grabbing;
-  }
 
   &.is-disabled {
     opacity: 0.55;
@@ -199,9 +194,21 @@ html.flamoji--sticker span.flamoji img {
   color: @muted-color;
   display: inline-flex;
   align-items: center;
-  padding: 4px 2px;
+  padding: 6px;
+  margin-left: -4px;
+  border-radius: @border-radius;
   flex-shrink: 0;
   touch-action: none;
+  cursor: grab;
+  transition: color 150ms ease;
+
+  &:hover {
+    color: @text-color;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .FlamojiSettings-reorderButtons {
