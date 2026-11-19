@@ -22,7 +22,8 @@ use PianoTell\Flamoji\Api\Controllers;
 return [
     (new Extend\Frontend('forum'))
         ->css(__DIR__.'/less/forum.less')
-        ->js(__DIR__.'/assets/dist/forum.js'),
+        ->js(__DIR__.'/assets/dist/forum.js')
+        ->route('/settings/flamoji', 'settings.flamoji'),
 
     (new Extend\Frontend('admin'))
         ->css(__DIR__.'/less/admin.less')
@@ -40,6 +41,22 @@ return [
         ->post('/pianotell/rename-category', 'emojis.rename-category', Controllers\RenameCategoryController::class)
         ->patch('/pianotell/emojis/{id}', 'emojis.update', Controllers\UpdateEmojiController::class)
         ->delete('/pianotell/emojis/{id}', 'emojis.delete', Controllers\DeleteEmojiController::class),
+
+    (new Extend\User())
+        ->registerPreference(
+            'flamojiDisabledCategories',
+            fn ($value) => is_array($value)
+                ? array_values(array_unique(array_map('trim', array_filter($value, 'is_string'))))
+                : [],
+            []
+        )
+        ->registerPreference(
+            'flamojiCategoryOrder',
+            fn ($value) => is_array($value)
+                ? array_values(array_unique(array_map('trim', array_filter($value, 'is_string'))))
+                : [],
+            []
+        ),
 
     (new Extend\Settings())
         ->default('pianotell-flamoji.auto_hide', true)
