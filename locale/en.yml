@@ -88,6 +88,22 @@ pianotell-flamoji:
 
   # Translations in this namespace are used by the forum user interface.
   forum:
+    # These translations are used by the dedicated Flamoji user settings page (/settings/flamoji).
+    settings:
+      nav_label: Emoji Picker
+      title: Emoji Picker Settings
+      emoji_categories_heading: Emoji Categories & Packs
+      emoji_categories_help: Enable, disable, and arrange the categories shown in your emoji picker. Drag the handle or use the arrow buttons to reorder them.
+      preview_heading: Live Picker Preview
+      preview_help: Test your customized emoji picker layout below.
+      preview_selected: "Selected: {shortcode}"
+      preview_empty: All emoji categories are currently disabled. Enable at least one category to preview the picker.
+      reset_button: Reset to Default
+      move_up_tooltip: Move up
+      move_down_tooltip: Move down
+      standard_badge: Standard
+      custom_badge: Custom Pack
+
     # These translations are used by the composer.
     composer:
       emoji_tooltip: Insert emoji

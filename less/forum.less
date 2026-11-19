@@ -123,3 +123,219 @@ html.flamoji--sticker span.flamoji img {
     50%      { opacity: 1; }
   }
 }
+
+.FlamojiSettingsPage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: start;
+
+  @media @phone, @tablet {
+    grid-template-columns: 1fr;
+  }
+
+  &--loading {
+    display: flex;
+    justify-content: center;
+    padding: 40px 0;
+  }
+}
+
+.FlamojiSettingsPage-preview {
+  position: sticky;
+  top: 72px;
+
+  @media @phone, @tablet {
+    position: static;
+  }
+}
+
+.FlamojiSettings-categoryList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.FlamojiSettings-categoryRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: @control-bg;
+  border: 1px solid transparent;
+  border-radius: @border-radius;
+  transition: opacity 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+
+  &.is-disabled {
+    opacity: 0.55;
+  }
+
+  &--ghost {
+    background: fade(@primary-color, 8%);
+    border: 2px dashed fade(@primary-color, 55%);
+
+    > * {
+      opacity: 0;
+    }
+  }
+
+  &--chosen {
+    border-color: @primary-color;
+  }
+
+  &--drag {
+    background: @body-bg;
+    .box-shadow(0 12px 28px rgba(0, 0, 0, 0.2));
+    opacity: 0.96 !important;
+  }
+}
+
+.FlamojiSettings-dragHandle {
+  color: @muted-color;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px;
+  margin-left: -4px;
+  border-radius: @border-radius;
+  flex-shrink: 0;
+  touch-action: none;
+  cursor: grab;
+  transition: color 150ms ease;
+
+  &:hover {
+    color: @text-color;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.FlamojiSettings-reorderButtons {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.FlamojiSettings-moveBtn {
+  padding: 4px 7px;
+  min-width: 28px;
+}
+
+.FlamojiSettings-categoryMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.FlamojiSettings-categoryTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.FlamojiSettings-builtinIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: @muted-color;
+  flex-shrink: 0;
+
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+    display: block;
+  }
+}
+
+.FlamojiSettings-categoryName {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.FlamojiSettings-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: @border-radius;
+  background: @body-bg;
+  color: @muted-color;
+
+  &--custom {
+    color: @primary-color;
+  }
+}
+
+.FlamojiSettings-categoryPreview {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.FlamojiSettings-previewImg {
+  height: 1.4em;
+  width: auto;
+  vertical-align: middle;
+}
+
+.FlamojiSettings-categoryToggle {
+  flex-shrink: 0;
+
+  .Checkbox {
+    margin: 0;
+  }
+}
+
+.FlamojiSettings-actions {
+  margin-top: 14px;
+}
+
+.FlamojiSettings-pickerMount {
+  em-emoji-picker.flamoji-settings-mockup-picker {
+    position: relative;
+    z-index: 1;
+    border-radius: @border-radius;
+    .box-shadow(0 2px 6px @shadow-color);
+    --background-rgb: red(@body-bg), green(@body-bg), blue(@body-bg);
+    --rgb-background: red(@body-bg), green(@body-bg), blue(@body-bg);
+    --rgb-input: red(@control-bg), green(@control-bg), blue(@control-bg);
+    --color-border: @control-bg;
+    --color-border-over: @primary-color;
+    --rgb-color: red(@text-color), green(@text-color), blue(@text-color);
+    --rgb-accent: red(@primary-color), green(@primary-color), blue(@primary-color);
+    --font-family: inherit;
+    --font-size: 14px;
+    --flamoji-category-header-color: @muted-color;
+    max-width: 100%;
+  }
+
+  em-emoji-picker.flamoji-settings-mockup-picker--sticker {
+    width: @flamoji-sticker-width;
+    height: @flamoji-sticker-height;
+  }
+}
+
+.FlamojiSettings-pickerEmpty {
+  padding: 24px 16px;
+  border: 1px dashed @control-bg;
+  border-radius: @border-radius;
+  color: @muted-color;
+  text-align: center;
+  max-width: 356px;
+}
+
+.FlamojiSettings-selectedPreview {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: @border-radius;
+  background: @control-bg;
+  font-size: 13px;
+  color: @text-color;
+}

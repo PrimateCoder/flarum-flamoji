@@ -450,4 +450,54 @@ class EmojisApiTest extends TestCase
             json_decode($attrs['flamoji.specify_categories'], true)
         );
     }
+
+    /** @test */
+    public function user_preferences_expose_default_empty_flamoji_preferences(): void
+    {
+        $response = $this->send($this->request('GET', '/api/users/2', [
+            'authenticatedAs' => 2,
+        ]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $body = json_decode($response->getBody()->getContents(), true);
+
+        $this->assertSame(
+            [],
+            $body['data']['attributes']['preferences']['flamojiDisabledCategories'] ?? null
+        );
+        $this->assertSame(
+            [],
+            $body['data']['attributes']['preferences']['flamojiCategoryOrder'] ?? null
+        );
+    }
+
+    /** @test */
+    public function user_can_update_flamoji_preferences(): void
+    {
+        $response = $this->send($this->request('PATCH', '/api/users/2', [
+            'authenticatedAs' => 2,
+            'json' => [
+                'data' => [
+                    'attributes' => [
+                        'preferences' => [
+                            'flamojiDisabledCategories' => ['  Memes  ', '', 'Memes', 123],
+                            'flamojiCategoryOrder' => ['custom:Memes', '  builtin:people  ', 'custom:Memes', 123],
+                        ],
+                    ],
+                ],
+            ],
+        ]));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $body = json_decode($response->getBody()->getContents(), true);
+
+        $this->assertSame(
+            ['Memes', ''],
+            $body['data']['attributes']['preferences']['flamojiDisabledCategories'] ?? null
+        );
+        $this->assertSame(
+            ['custom:Memes', 'builtin:people'],
+            $body['data']['attributes']['preferences']['flamojiCategoryOrder'] ?? null
+        );
+    }
 }
