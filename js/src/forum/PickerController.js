@@ -11,6 +11,13 @@ import PickerLoader from './components/PickerLoader';
 import positionPopup from './utils/positionPopup';
 import { injectEmojiMartRgbVars, injectShadowStyles } from './utils/pickerTheme';
 import buildPickerConfig from './utils/buildPickerConfig';
+import {
+  getActiveLocale,
+  getLocalizedSearchUrlTemplate,
+  loadLocalizedAnnotations,
+  mergeLocalizedKeywords,
+  resolveEmojibaseLocale,
+} from './utils/localizedEmojiData';
 
 const t = 'pianotell-flamoji.forum.';
 
@@ -328,7 +335,22 @@ export default class PickerController {
     // mode is enabled. When it's off (the common case), start the dataset load
     // immediately, in parallel with the API — otherwise we needlessly serialize
     // the 460KB dataset behind the API round-trip.
-    //
+    const showSearch = !!app.forum.attribute('flamoji.show_search');
+    const urlTemplate = getLocalizedSearchUrlTemplate();
+    const searchLocale = showSearch && urlTemplate ? resolveEmojibaseLocale(getActiveLocale()) : null;
+    const preloadedAnnotations = searchLocale && !stickerMode ? loadLocalizedAnnotations(searchLocale, urlTemplate) : null;
+
+    const loadLocalizedUnicodeData = () => {
+      const dataPromise = loadUnicodeData();
+      if (!searchLocale) return dataPromise;
+
+      const annotationsPromise = preloadedAnnotations || loadLocalizedAnnotations(searchLocale, urlTemplate);
+      return Promise.all([dataPromise, annotationsPromise]).then(([dataModule, annotations]) => {
+        if (!annotations) return dataModule;
+        return mergeLocalizedKeywords(dataModule.default || dataModule, annotations);
+      });
+    };
+
     // emoji-mart's preview renders one of a few built-in default emoji
     // depending on state: "point_up" (bottom idle), "point_down" (top idle),
     // and "cry" (no search results). Seed all three as native glyphs so the
@@ -350,9 +372,9 @@ export default class PickerController {
     const loadData = stickerMode
       ? loadApi.then((response) => {
           const customEmojisCount = Object.keys(response).filter((k) => !isNaN(k)).length;
-          return customEmojisCount > 0 ? STICKER_SKELETON : loadUnicodeData();
+          return customEmojisCount > 0 ? STICKER_SKELETON : loadLocalizedUnicodeData();
         })
-      : loadUnicodeData();
+      : loadLocalizedUnicodeData();
 
     return Promise.all([loadJs, loadData, loadApi])
       .then(([emojiMartModule, dataModule, response]) => {
